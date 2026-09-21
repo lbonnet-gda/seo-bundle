@@ -7,6 +7,7 @@ namespace Lbonnet\SeoBundle;
 use Lbonnet\SeoBundle\Http\ThrottledHttpClient;
 use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\Severity;
+use Lbonnet\SeoBundle\Module\ModuleInterface;
 use Lbonnet\SeoBundle\Storage\JsonFileReportStorage;
 use Lbonnet\SeoBundle\Storage\ReportStorageInterface;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
@@ -91,6 +92,7 @@ final class SeoBundle extends AbstractBundle
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         $container->import('../config/services.php');
+        $builder->registerForAutoconfiguration(ModuleInterface::class)->addTag('seo.module');
 
         $parameters = $container->parameters()
             ->set('seo.base_url', $config['base_url'])

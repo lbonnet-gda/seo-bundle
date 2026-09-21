@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle\Tests;
 
+use Lbonnet\SeoBundle\Audit\SeoAuditor;
+use Lbonnet\SeoBundle\Audit\SeoAuditorInterface;
 use Lbonnet\SeoBundle\Command\CheckSeoCommand;
+use Lbonnet\SeoBundle\Crawl\SiteCrawler;
 use Lbonnet\SeoBundle\EventListener\StoreReportListener;
 use Lbonnet\SeoBundle\Http\ThrottledHttpClient;
 use Lbonnet\SeoBundle\MessageHandler\CheckSeoMessageHandler;
@@ -17,6 +20,7 @@ use Lbonnet\SeoBundle\Storage\ReportStorageInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\HttpClient\NoPrivateNetworkHttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -114,6 +118,8 @@ final class SeoBundleTest extends TestCase
 
         foreach (
             [
+                SeoAuditor::class,
+                SiteCrawler::class,
                 CheckSeoCommand::class,
                 CheckSeoMessageHandler::class,
                 StoreReportListener::class,
@@ -138,6 +144,23 @@ final class SeoBundleTest extends TestCase
             $container->hasAlias(HttpClientInterface::class),
             'The bundle must not replace the application\'s own HTTP client'
         );
+    }
+
+    public function testTheContainerCompilesWithTheAuditorWiredToTheThrottledClient(): void
+    {
+        $container = $this->load([]);
+        $container->register(HttpClientInterface::class)->setSynthetic(true)->setPublic(true);
+        $container->getAlias(SeoAuditorInterface::class)->setPublic(true);
+        $container->getDefinition(CheckSeoCommand::class)->setPublic(true);
+
+        $container->compile();
+
+        $auditor = $container->findDefinition(SeoAuditorInterface::class);
+        $this->assertSame(SeoAuditor::class, $auditor->getClass());
+
+        $httpClient = $auditor->getArgument(1);
+        $httpClient = $httpClient instanceof Definition ? $httpClient : $container->findDefinition((string)$httpClient);
+        $this->assertSame(ThrottledHttpClient::class, $httpClient->getClass());
     }
 
     public function testAnUnknownDisabledCheckIsRejected(): void
