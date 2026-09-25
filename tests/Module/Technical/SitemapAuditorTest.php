@@ -38,6 +38,7 @@ final class SitemapAuditorTest extends TestCase
                 Response::HTTP_OK,
                 ['x-robots-tag' => ['noindex']],
             ),
+            'https://example.com/unreachable' => new PageResponse($url, 0),
             'https://example.com/unknown' => null,
             default => throw new LogicException(sprintf('"%s" should not be probed.', $url)),
         });
@@ -49,6 +50,7 @@ final class SitemapAuditorTest extends TestCase
                     'https://example.com/gone',
                     'https://example.com/old',
                     'https://example.com/hidden',
+                    'https://example.com/unreachable',
                     'https://example.com/unknown',
                     'https://example.com/private/page',
                     'https://example.com/filtered',
@@ -75,6 +77,7 @@ final class SitemapAuditorTest extends TestCase
                     IssueType::SitemapUrlNotOk,
                     IssueType::SitemapUrlRedirects,
                     IssueType::SitemapUrlNoindex,
+                    IssueType::SitemapUrlNotOk,
                     IssueType::SitemapUrlBlockedByRobotsTxt,
                     IssueType::SitemapUrlNotCanonical,
                 ],

@@ -44,6 +44,18 @@ final class HttpTargetProbeTest extends TestCase
         $this->assertNull($probe->probe('https://fifth.com/'));
     }
 
+    public function testAUrlThatNeverAnswersComesBackWithNoStatus(): void
+    {
+        $httpClient = new MockHttpClient(
+            static fn(): MockResponse => new MockResponse('', ['error' => 'Could not resolve host'])
+        );
+
+        $response = (new HttpTargetProbe(new PageFetcher($httpClient)))->probe('https://typo-domain.example/page');
+
+        $this->assertNotNull($response);
+        $this->assertSame(HttpTargetProbe::NO_ANSWER, $response->statusCode);
+    }
+
     public function testResetForgetsTheFetchedRobotsTxt(): void
     {
         $provider = $this->createMock(RobotsTxtProviderInterface::class);

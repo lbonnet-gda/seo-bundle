@@ -12,6 +12,9 @@ use Lbonnet\SeoBundle\Url\UrlResolver;
 
 final class HttpTargetProbe implements TargetProbeInterface
 {
+    /** The status of a URL that was requested and never answered: DNS, timeout or TLS failure. */
+    public const NO_ANSWER = 0;
+
     /** @var array<string, PageResponse|null> dedup key => response (null = probed and failed) */
     private array $cache = [];
 
@@ -46,7 +49,8 @@ final class HttpTargetProbe implements TargetProbeInterface
 
         $this->probesUsed++;
 
-        return $this->cache[$key] = $this->pageFetcher->fetch($url, readHtml: false);
+        return $this->cache[$key] = $this->pageFetcher->fetch($url, readHtml: false)
+            ?? new PageResponse($url, self::NO_ANSWER);
     }
 
     public function robotsTxt(string $url): ?RobotsTxt

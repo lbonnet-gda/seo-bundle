@@ -9,6 +9,7 @@ use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\PageResponse;
 use Lbonnet\SeoBundle\Model\RedirectChain;
 use Lbonnet\SeoBundle\Model\RedirectHop;
+use Lbonnet\SeoBundle\Module\Technical\Http\HttpTargetProbe;
 use Lbonnet\SeoBundle\Module\Technical\Http\TargetProbeInterface;
 use Lbonnet\SeoBundle\Module\Technical\Model\CrawlContext;
 use Lbonnet\SeoBundle\Module\Technical\Model\PageAudit;
@@ -174,6 +175,19 @@ final class SiteAuditor implements SiteAuditorInterface
             return [];
         }
 
+        if ($response->statusCode === HttpTargetProbe::NO_ANSWER) {
+            return [
+                new Issue(
+                    IssueType::CanonicalTargetNotOk,
+                    sprintf(
+                        'The canonical URL "%s" could not be reached at all (DNS, timeout or TLS failure), '
+                        .'so this page has no valid canonical.',
+                        $target,
+                    ),
+                ),
+            ];
+        }
+
         if ($response->isRedirect()) {
             return [
                 new Issue(
@@ -314,6 +328,18 @@ final class SiteAuditor implements SiteAuditorInterface
             $response = self::crawledResponse($target, $context) ?? $this->probe->probe($target);
 
             if ($response === null) {
+                continue;
+            }
+
+            if ($response->statusCode === HttpTargetProbe::NO_ANSWER) {
+                $issues[] = new Issue(
+                    IssueType::HreflangTargetNotOk,
+                    sprintf(
+                        'The hreflang alternate "%s" could not be reached at all (DNS, timeout or TLS failure).',
+                        $target,
+                    ),
+                );
+
                 continue;
             }
 

@@ -40,7 +40,7 @@ since sharing a title with them is not a duplicate-content problem.
 |------------------------------|----------|---------------------------------------------------------------------------------------------|
 | `canonical_multiple`         | error    | Several conflicting `<link rel="canonical">`: search engines ignore all of them             |
 | `canonical_not_in_head`      | error    | A canonical outside `<head>` — usually an invalid element ending `<head>` early             |
-| `canonical_target_not_ok`    | error    | The canonical URL answers 4xx/5xx                                                           |
+| `canonical_target_not_ok`    | error    | The canonical URL answers 4xx/5xx, or never answers at all                                  |
 | `canonical_target_redirects` | error    | The canonical URL answers 3xx instead of 200                                                |
 | `canonical_target_noindex`   | error    | The canonical URL carries a `noindex` (meta tag, or `X-Robots-Tag` for an uncrawled target) |
 | `canonical_relative`         | warning  | A canonical href that is not an absolute URL (an empty href included)                       |
@@ -104,7 +104,7 @@ first three checks cost up to four requests per audit, on the home page; the las
 | `sitemap_not_ok`                    | error    | A declared sitemap, or one listed in a sitemap index, does not answer 200                    |
 | `sitemap_invalid`                   | error    | A sitemap that is not valid XML, over 50,000 entries or 50 MB, or a nested sitemap index     |
 | `sitemap_url_invalid`               | error    | A listed URL that is relative or on another host, or a sitemap outside its index's directory |
-| `sitemap_url_not_ok`                | error    | A listed URL answering 4xx/5xx                                                               |
+| `sitemap_url_not_ok`                | error    | A listed URL answering 4xx/5xx, or never answering                                           |
 | `sitemap_url_redirects`             | warning  | A listed URL answering 3xx instead of the final URL                                          |
 | `sitemap_url_noindex`               | error    | A listed URL carrying a noindex directive                                                    |
 | `sitemap_url_not_canonical`         | error    | A listed URL whose canonical points elsewhere                                                |
@@ -124,7 +124,7 @@ followed one level deep, gzip is supported, and at most `max_sitemap_files` file
 | `hreflang_conflicting_urls`     | error    | The same hreflang value declared for several URLs                                                                                          |
 | `hreflang_missing_self`         | error    | The page lists its alternates but not itself                                                                                               |
 | `hreflang_not_reciprocal`       | error    | A crawled alternate does not link back to the page, so both annotations are ignored                                                        |
-| `hreflang_target_not_ok`        | error    | An alternate answers 4xx/5xx                                                                                                               |
+| `hreflang_target_not_ok`        | error    | An alternate answers 4xx/5xx, or never answers at all                                                                                      |
 | `hreflang_target_redirects`     | error    | An alternate answers 3xx instead of 200                                                                                                    |
 | `hreflang_target_not_canonical` | error    | A crawled alternate declares another URL as its canonical                                                                                  |
 | `hreflang_target_noindex`       | error    | An alternate carries a `noindex` (meta tag, or `X-Robots-Tag` for an uncrawled alternate)                                                  |

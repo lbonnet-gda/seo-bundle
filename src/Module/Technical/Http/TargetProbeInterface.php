@@ -10,9 +10,9 @@ use Lbonnet\SeoBundle\Robots\RobotsTxt;
 interface TargetProbeInterface
 {
     /**
-     * Fetches a URL that was not part of the crawl without following redirects. Returns null
-     * when probing is disabled, the budget is exhausted, or the request failed — in which case
-     * the caller must not report anything about that URL.
+     * Fetches a URL that was not part of the crawl without following redirects. Returns null when the URL was not
+     * requested at all — probing is disabled, or the budget is exhausted — in which case the caller must not report
+     * anything about it. A URL that was requested but never answered comes back with a status of 0.
      */
     public function probe(string $url): ?PageResponse;
 

@@ -635,6 +635,20 @@ final class SiteAuditorTest extends TestCase
         $this->assertSame([IssueType::RobotsTxtBlocksHreflangAlternate], self::types($audited[0]->issues));
     }
 
+    public function testFlagsACanonicalTargetThatNeverAnswers(): void
+    {
+        $probe = $this->createMock(TargetProbeInterface::class);
+        $probe->method('probe')->willReturn(new PageResponse('https://typo-domain.example/page', 0));
+
+        $audited = (new SiteAuditor($probe))->audit(
+            [$this->page('https://example.com/', canonical: 'https://typo-domain.example/page')],
+            new CrawlContext(),
+        );
+
+        $this->assertSame([IssueType::CanonicalTargetNotOk], self::types($audited[0]->issues));
+        $this->assertStringContainsString('could not be reached', $audited[0]->issues[0]->message);
+    }
+
     public function testACanonicalToTheHttpVersionOfACrawledPageIsStillChecked(): void
     {
         $probe = $this->createMock(TargetProbeInterface::class);

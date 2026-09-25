@@ -7,6 +7,7 @@ namespace Lbonnet\SeoBundle\Module\Technical;
 use Lbonnet\SeoBundle\Model\Issue;
 use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\PageResponse;
+use Lbonnet\SeoBundle\Module\Technical\Http\HttpTargetProbe;
 use Lbonnet\SeoBundle\Module\Technical\Http\SitemapFetcher;
 use Lbonnet\SeoBundle\Module\Technical\Http\TargetProbeInterface;
 use Lbonnet\SeoBundle\Module\Technical\Model\CrawlContext;
@@ -282,6 +283,13 @@ final class SitemapAuditor implements SitemapAuditorInterface
 
         if ($response === null) {
             return null;
+        }
+
+        if ($response->statusCode === HttpTargetProbe::NO_ANSWER) {
+            return new Issue(
+                IssueType::SitemapUrlNotOk,
+                sprintf('The sitemap lists "%s", which could not be reached at all.', $url),
+            );
         }
 
         if ($response->isRedirect()) {
