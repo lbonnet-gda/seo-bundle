@@ -164,7 +164,7 @@ final class SiteAuditor implements SiteAuditorInterface
             ];
         }
 
-        $response = $context->responseFor($target) ?? $this->probe->probe($target);
+        $response = self::crawledResponse($target, $context) ?? $this->probe->probe($target);
 
         if ($response === null) {
             return [];
@@ -307,7 +307,7 @@ final class SiteAuditor implements SiteAuditorInterface
                 continue;
             }
 
-            $response = $context->responseFor($target) ?? $this->probe->probe($target);
+            $response = self::crawledResponse($target, $context) ?? $this->probe->probe($target);
 
             if ($response === null) {
                 continue;
@@ -464,6 +464,13 @@ final class SiteAuditor implements SiteAuditorInterface
             : $this->probe->robotsTxt($url);
 
         return $robotsTxt?->isAllowed($url, self::GOOGLEBOT) === false;
+    }
+
+    private static function crawledResponse(string $url, CrawlContext $context): ?PageResponse
+    {
+        $response = $context->responseFor($url);
+
+        return $response !== null && UrlResolver::isSameUrl($response->url, $url) ? $response : null;
     }
 
     private static function hostOf(string $url): string

@@ -34,7 +34,7 @@ final class HttpTargetProbe implements TargetProbeInterface
             return null;
         }
 
-        $key = UrlResolver::dedupKey($url);
+        $key = UrlResolver::exactKey($url);
 
         if (array_key_exists($key, $this->cache)) {
             return $this->cache[$key];

@@ -614,6 +614,24 @@ final class SiteAuditorTest extends TestCase
         $this->assertSame([IssueType::RobotsTxtBlocksHreflangAlternate], self::types($audited[0]->issues));
     }
 
+    public function testACanonicalToTheHttpVersionOfACrawledPageIsStillChecked(): void
+    {
+        $probe = $this->createMock(TargetProbeInterface::class);
+        $probe->expects($this->once())
+            ->method('probe')
+            ->with('http://example.com/page')
+            ->willReturn(new PageResponse('http://example.com/page', Response::HTTP_MOVED_PERMANENTLY));
+
+        $auditor = new SiteAuditor($probe);
+
+        $audited = $auditor->audit(
+            [$this->page('https://example.com/page', canonical: 'http://example.com/page')],
+            self::okResponses('https://example.com/page'),
+        );
+
+        $this->assertSame([IssueType::CanonicalTargetRedirects], self::types($audited[0]->issues));
+    }
+
     public function testReadsTheRobotsTxtOfATargetOnAnotherHostThroughTheProbe(): void
     {
         $probe = $this->createMock(TargetProbeInterface::class);

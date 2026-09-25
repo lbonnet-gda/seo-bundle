@@ -58,7 +58,7 @@ final class PageSignals
 
         $canonical = UrlResolver::resolve($pageUrl, $href);
 
-        if ($canonical === null || UrlResolver::dedupKey($canonical) === UrlResolver::dedupKey($pageUrl)) {
+        if ($canonical === null || UrlResolver::isSameUrl($canonical, $pageUrl)) {
             return null;
         }
 
