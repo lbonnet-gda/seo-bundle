@@ -41,13 +41,15 @@ final class SeoReportTest extends TestCase
 
     public function testEveryIssueTypeHasASeverityAndAModule(): void
     {
+        $severities = [];
         $modules = [];
 
         foreach (IssueType::cases() as $type) {
-            $type->severity();
+            $severities[$type->value] = $type->severity()->value;
             $modules[$type->module()->value] = ($modules[$type->module()->value] ?? 0) + 1;
         }
 
+        $this->assertCount(count(IssueType::cases()), $severities);
         $this->assertSame(['links' => 3, 'on_page' => 9, 'technical' => 48], $modules);
     }
 }
