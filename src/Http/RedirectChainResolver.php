@@ -23,7 +23,8 @@ final class RedirectChainResolver implements RedirectChainResolverInterface
         $startStatusCode = $response->statusCode;
         /** @var list<RedirectHop> $hops */
         $hops = [];
-        $seen = [UrlResolver::dedupKey($startUrl) => true];
+        // Keyed on the exact URL: http:// and https:// share a dedup key, and a site moving to https is not a loop.
+        $seen = [UrlResolver::exactKey($startUrl) => true];
         $current = $response;
 
         while (true) {
@@ -34,7 +35,7 @@ final class RedirectChainResolver implements RedirectChainResolverInterface
             }
 
             $hops[] = new RedirectHop($current->url, $current->statusCode, $location);
-            $key = UrlResolver::dedupKey($location);
+            $key = UrlResolver::exactKey($location);
 
             if (isset($seen[$key])) {
                 return new RedirectChain($startUrl, $startStatusCode, $hops, $location, null, isLoop: true);

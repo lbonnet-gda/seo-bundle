@@ -428,7 +428,7 @@ final class SitemapAuditor implements SitemapAuditorInterface
 
     private static function key(string $url): string
     {
-        return strtolower((string)parse_url($url, PHP_URL_SCHEME)).'|'.UrlResolver::dedupKey($url);
+        return UrlResolver::exactKey($url);
     }
 
     /**

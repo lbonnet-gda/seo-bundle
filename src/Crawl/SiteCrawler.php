@@ -43,18 +43,18 @@ final class SiteCrawler
         $urlsChecked = 0;
         $truncated = false;
 
-        /** @var list<array{url: string, depth: int, read: bool}> $queue */
-        $queue = [['url' => $startUrl, 'depth' => 0, 'read' => true]];
+        /** @var list<array{url: string, depth: int, read: bool, force: bool}> $queue */
+        $queue = [['url' => $startUrl, 'depth' => 0, 'read' => true, 'force' => false]];
 
         $startKey = UrlResolver::dedupKey($startUrl);
         $siteHost = self::hostOf($startUrl);
         $siteUrl = $startUrl;
 
         while ($queue !== []) {
-            ['url' => $url, 'depth' => $depth, 'read' => $read] = array_shift($queue);
+            ['url' => $url, 'depth' => $depth, 'read' => $read, 'force' => $force] = array_shift($queue);
             $key = UrlResolver::dedupKey($url);
 
-            if (isset($visited[$key])) {
+            if (isset($visited[$key]) && !$force) {
                 continue;
             }
 
@@ -103,7 +103,14 @@ final class SiteCrawler
                     && $chain->finalStatusCode !== null
                     && $this->isCrawlable($finalUrl, $siteHost, $options->excludePatterns)
                 ) {
-                    $queue[] = ['url' => $finalUrl, 'depth' => $depth, 'read' => true];
+                    // A redirect from http:// to https:// lands on a URL sharing its dedup key: it is the page we
+                    // came for, so it must be read even though that key is already marked visited.
+                    $queue[] = [
+                        'url' => $finalUrl,
+                        'depth' => $depth,
+                        'read' => true,
+                        'force' => UrlResolver::dedupKey($finalUrl) === $key,
+                    ];
                 }
 
                 continue;
@@ -135,7 +142,7 @@ final class SiteCrawler
                     continue;
                 }
 
-                $queue[] = ['url' => $link->url, 'depth' => $depth + 1, 'read' => $readLinks];
+                $queue[] = ['url' => $link->url, 'depth' => $depth + 1, 'read' => $readLinks, 'force' => false];
             }
         }
 

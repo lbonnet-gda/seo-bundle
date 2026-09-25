@@ -64,6 +64,21 @@ final class RedirectChainResolverTest extends TestCase
         $this->assertSame(Response::HTTP_FOUND, $chain->startStatusCode);
     }
 
+    public function testMovingToHttpsIsNotALoop(): void
+    {
+        $chain = $this->resolver(['https://example.com/page' => ['', ['http_code' => Response::HTTP_OK]]])->resolve(
+            new PageResponse(
+                'http://example.com/page',
+                Response::HTTP_MOVED_PERMANENTLY,
+                ['location' => ['https://example.com/page']],
+            )
+        );
+
+        $this->assertFalse($chain->isLoop);
+        $this->assertSame('https://example.com/page', $chain->finalUrl);
+        $this->assertSame(Response::HTTP_OK, $chain->finalStatusCode);
+    }
+
     public function testDetectsALoop(): void
     {
         $resolver = $this->resolver([

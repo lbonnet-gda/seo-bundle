@@ -59,6 +59,22 @@ final class SiteCrawlerTest extends TestCase
         $this->assertSame(['https://example.com/'], $crawl->referrersOf('https://example.com/old'));
     }
 
+    public function testReadsTheSitePastAnHttpToHttpsRedirect(): void
+    {
+        $this->requestedUrls = [];
+        $site = [
+            'http://example.com/' => self::redirect('https://example.com/'),
+            'https://example.com/' => self::page('<a href="/about">About</a>'),
+            'https://example.com/about' => self::page(),
+        ];
+
+        $crawl = $this->crawler($this->httpClient($site))->crawl('http://example.com/', new CrawlOptions());
+
+        // The https URL shares its dedup key with the http one, but it is the page we came for.
+        $this->assertSame(['https://example.com/', 'https://example.com/about'], self::urls($crawl));
+        $this->assertFalse($crawl->redirectChains()['https://example.com/']->isLoop);
+    }
+
     public function testDoesNotReadNonHtmlResponsesButKeepsTheirStatus(): void
     {
         $crawl = $this->crawl([
