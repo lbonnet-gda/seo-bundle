@@ -50,6 +50,7 @@ final class JsonFileReportStorage implements ReportStorageInterface
             'totalDuration' => $report->totalDuration,
             'truncated' => $report->truncated,
             'blockedByRobotsTxt' => $report->blockedByRobotsTxt,
+            'startUrlStatusCode' => $report->startUrlStatusCode,
             'issuesCount' => $report->getIssuesCount(),
             'issuesBySeverity' => $report->getIssuesCountBySeverity(),
             'issuesByModule' => $report->getIssuesCountByModule(),

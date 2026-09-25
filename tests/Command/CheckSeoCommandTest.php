@@ -115,6 +115,26 @@ final class CheckSeoCommandTest extends TestCase
         $this->assertSame(Command::FAILURE, $tester->execute(['--fail-on' => 'warning']));
     }
 
+    public function testItFailsWhenNothingCouldBeAudited(): void
+    {
+        $tester = $this->tester(new SeoReport('https://example.com', startUrlStatusCode: Response::HTTP_NOT_FOUND));
+
+        $this->assertSame(Command::FAILURE, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('Nothing could be audited', $display);
+        $this->assertStringContainsString('answers 404', $display);
+        $this->assertStringNotContainsString('All clear', $display);
+    }
+
+    public function testItSaysWhenTheSiteCouldNotBeReachedAtAll(): void
+    {
+        $tester = $this->tester(new SeoReport('https://example.com', startUrlStatusCode: 0));
+
+        $this->assertSame(Command::FAILURE, $tester->execute([]));
+        $this->assertStringContainsString('could not be reached', $tester->getDisplay());
+    }
+
     public function testItWarnsAboutAnIncompleteCrawl(): void
     {
         $tester = $this->tester(

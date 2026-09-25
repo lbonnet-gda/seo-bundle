@@ -110,6 +110,7 @@ final class SeoAuditor implements SeoAuditorInterface
             totalDuration: round(microtime(true) - $startTime, 3),
             truncated: $crawl->truncated,
             blockedByRobotsTxt: $crawl->blockedByRobotsTxt,
+            startUrlStatusCode: self::startUrlStatusCode($crawl),
         );
 
         try {
@@ -119,6 +120,21 @@ final class SeoAuditor implements SeoAuditorInterface
         }
 
         return $report;
+    }
+
+    private static function startUrlStatusCode(CrawlResult $crawl): ?int
+    {
+        if ($crawl->pages !== []) {
+            return null;
+        }
+
+        $chain = $crawl->redirectChains()[UrlResolver::dedupKey($crawl->startUrl)] ?? null;
+
+        if ($chain !== null) {
+            return $chain->finalStatusCode ?? 0;
+        }
+
+        return $crawl->responseFor($crawl->startUrl)->statusCode ?? 0;
     }
 
     /**

@@ -69,6 +69,35 @@ final class SeoAuditorTest extends TestCase
         $this->assertSame(Response::HTTP_OK, $report->pages[1]->statusCode);
     }
 
+    /**
+     * @dataProvider deadStartUrlProvider
+     */
+    public function testFlagsAnAuditThatCouldNotReadASinglePage(string $startUrl, ?int $expected): void
+    {
+        $report = $this->auditor([new FakeModule(Module::Links)])->audit($startUrl);
+
+        $this->assertSame(0, $report->pagesRead);
+        $this->assertSame($expected, $report->startUrlStatusCode);
+    }
+
+    /**
+     * @return iterable<string, array{string, int|null}>
+     */
+    public static function deadStartUrlProvider(): iterable
+    {
+        yield 'not found' => ['https://example.com/nope', Response::HTTP_NOT_FOUND];
+        yield 'unreachable' => ['https://example.com/timeout', 0];
+        yield 'redirecting to an error' => ['https://example.com/moved', Response::HTTP_NOT_FOUND];
+    }
+
+    public function testAnAuditThatReadPagesCarriesNoStartUrlStatus(): void
+    {
+        $report = $this->auditor([new FakeModule(Module::Links)])->audit('https://example.com/');
+
+        $this->assertSame(3, $report->pagesRead);
+        $this->assertNull($report->startUrlStatusCode);
+    }
+
     public function testRunsOnlyTheRequestedModules(): void
     {
         $links = new FakeModule(Module::Links);
@@ -165,6 +194,18 @@ final class SeoAuditorTest extends TestCase
     ): SeoAuditor {
         $httpClient = new MockHttpClient(function (string $method, string $url): MockResponse {
             $this->requestedUrls[] = $url;
+
+            if ($url === 'https://example.com/timeout') {
+                return new MockResponse('', ['error' => 'Operation timed out']);
+            }
+
+            if ($url === 'https://example.com/moved') {
+                return new MockResponse('', [
+                    'http_code' => Response::HTTP_MOVED_PERMANENTLY,
+                    'response_headers' => ['location' => 'https://example.com/nope'],
+                ]);
+            }
+
             $body = self::SITE[$url] ?? null;
 
             if ($body === null) {

@@ -184,6 +184,20 @@ final class CheckSeoCommand extends Command
                 $io->newLine();
             }
 
+            if ($report->startUrlStatusCode !== null) {
+                $io->error(
+                    sprintf(
+                        'Nothing could be audited: "%s" %s. Check the URL, and that the site answers.',
+                        $report->startUrl,
+                        $report->startUrlStatusCode === 0
+                            ? 'could not be reached (DNS, timeout or TLS failure)'
+                            : sprintf('answers %d', $report->startUrlStatusCode),
+                    )
+                );
+
+                return Command::FAILURE;
+            }
+
             self::renderCrawlWarnings($io, $report);
 
             if (!$report->hasIssues()) {

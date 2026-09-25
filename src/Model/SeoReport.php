@@ -19,6 +19,7 @@ final class SeoReport
         public readonly float $totalDuration = 0.0,
         public readonly bool $truncated = false,
         public readonly bool $blockedByRobotsTxt = false,
+        public readonly ?int $startUrlStatusCode = null,
     ) {
     }
 

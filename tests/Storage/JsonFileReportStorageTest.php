@@ -47,6 +47,7 @@ final class JsonFileReportStorageTest extends TestCase
         $this->assertSame(3, $decoded['urlsChecked']);
         $this->assertFalse($decoded['truncated']);
         $this->assertFalse($decoded['blockedByRobotsTxt']);
+        $this->assertNull($decoded['startUrlStatusCode']);
         $this->assertSame(2, $decoded['issuesCount']);
         $this->assertSame(['error' => 2, 'warning' => 0, 'notice' => 0], $decoded['issuesBySeverity']);
         $this->assertSame(['links' => 1, 'technical' => 1], $decoded['issuesByModule']);
