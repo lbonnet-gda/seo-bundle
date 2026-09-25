@@ -42,9 +42,10 @@
     },
     "require-dev": {
         "phpstan/phpstan": "^2.2",
+        "phpunit/phpunit": "^10.5 || ^11.5",
         "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
         "symfony/phpunit-bridge": "^6.4 || ^7.0 || ^8.0",
-        "phpunit/phpunit": "^10.5 || ^11.5"
+        "symfony/yaml": "^6.4 || ^7.0 || ^8.0"
     },
     "suggest": {
         "symfony/notifier": "To send alerts (Slack, email, ...) from a SeoAuditCompletedEvent listener.",
