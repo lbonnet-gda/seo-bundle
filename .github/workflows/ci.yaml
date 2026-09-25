@@ -77,3 +77,77 @@ jobs:
 
             -   name: Run PHPStan
                 run: ./vendor/bin/phpstan analyse --no-progress
+
+    iso-codes:
+        name: ISO codes freshness
+        runs-on: ubuntu-latest
+        continue-on-error: true
+        permissions:
+            contents: read
+            pull-requests: write
+
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v7
+
+            -   name: Setup PHP
+                uses: shivammathur/setup-php@v2
+                with:
+                    php-version: '8.4'
+                    coverage: none
+
+            -   name: Compare the ISO codes with their latest sources
+                id: check
+                run: |
+                    set +e
+                    php tools/generate-iso-codes.php --iso-codes-ref=latest --check > report.md
+                    status=$?
+                    set -e
+                    cat report.md
+                    if [ "$status" != 0 ] && [ "$status" != 3 ]; then
+                      exit "$status"
+                    fi
+                    cat report.md >> "$GITHUB_STEP_SUMMARY"
+                    if [ "$status" = 3 ]; then
+                      echo "outdated=true" >> "$GITHUB_OUTPUT"
+                      echo "::warning title=Outdated ISO codes::$(head -n 1 report.md)"
+                    else
+                      echo "outdated=false" >> "$GITHUB_OUTPUT"
+                    fi
+
+            -   name: Report on the pull request
+                if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+                env:
+                    GH_TOKEN: ${{ github.token }}
+                    GH_REPO: ${{ github.repository }}
+                    PR_NUMBER: ${{ github.event.pull_request.number }}
+                    OUTDATED: ${{ steps.check.outputs.outdated }}
+                run: |
+                    marker='<!-- iso-codes-freshness -->'
+                    existing=$(gh api --paginate "repos/{owner}/{repo}/issues/$PR_NUMBER/comments" \
+                      --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$marker\"))) | .id")
+                    existing=${existing%%$'\n'*}
+
+                    # Stay silent while the codes are fine; once a comment exists, keep it in sync instead of adding more.
+                    if [ "$OUTDATED" != true ] && [ -z "$existing" ]; then
+                      exit 0
+                    fi
+
+                    { echo "$marker"; echo; cat report.md; } > comment.md
+
+                    if [ -n "$existing" ]; then
+                      gh api -X PATCH "repos/{owner}/{repo}/issues/comments/$existing" -F body=@comment.md > /dev/null
+                    else
+                      gh api -X POST "repos/{owner}/{repo}/issues/$PR_NUMBER/comments" -F body=@comment.md > /dev/null
+                    fi
+
+    ci-status:
+        name: CI Status
+        needs: [ phpunit, phpstan ]
+        runs-on: ubuntu-latest
+        if: always()
+        steps:
+            -   run: |
+                    if [ "${{ needs.phpunit.result }}" != "success" ] || [ "${{ needs.phpstan.result }}" != "success" ]; then
+                      exit 1
+                    fi
