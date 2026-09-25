@@ -8,6 +8,7 @@ use Lbonnet\SeoBundle\Http\PageFetcher;
 use Lbonnet\SeoBundle\Http\RedirectChainResolver;
 use Lbonnet\SeoBundle\Http\RedirectChainResolverInterface;
 use Lbonnet\SeoBundle\MessageHandler\CheckSeoMessageHandler;
+use Lbonnet\SeoBundle\Module\Links\LinksModule;
 use Lbonnet\SeoBundle\Module\Links\UrlChecker;
 use Lbonnet\SeoBundle\Module\OnPage\PageAuditor as OnPagePageAuditor;
 use Lbonnet\SeoBundle\Module\Technical\Http\HttpTargetProbe;
@@ -70,6 +71,9 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$httpClient', service('seo.http_client'))
         ->arg('$defaultTimeout', param('seo.crawl.timeout'))
         ->arg('$userAgent', param('seo.crawl.user_agent'));
+
+    $services->set(LinksModule::class)
+        ->arg('$disabledChecks', param('seo.disabled_checks'));
 
     $services->set(OnPagePageAuditor::class)
         ->arg('$maxTitleLength', param('seo.on_page.max_title_length'))

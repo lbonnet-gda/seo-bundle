@@ -181,6 +181,29 @@ final class LinksModuleTest extends TestCase
         );
     }
 
+    public function testDisablingBothExternalChecksSendsNoExternalRequest(): void
+    {
+        $httpClient = new MockHttpClient(function (string $method, string $url): MockResponse {
+            $this->requestedUrls[] = $url;
+            $site = ['https://example.com/' => self::page('<a href="https://other.com/gone">Gone</a>')];
+            [$body, $info] = $site[$url] ?? ['', ['http_code' => Response::HTTP_NOT_FOUND]];
+
+            return new MockResponse($body, $info);
+        });
+        $pageFetcher = new PageFetcher($httpClient);
+        $disabled = [IssueType::BrokenExternalLink->value, IssueType::ExternalLinkLikelyBlocked->value];
+
+        $report = (new SeoAuditor(
+            crawler: new SiteCrawler($pageFetcher, new RedirectChainResolver($pageFetcher)),
+            httpClient: $httpClient,
+            modules: [new LinksModule(new UrlChecker($httpClient), $disabled)],
+            disabledChecks: $disabled,
+        ))->audit('https://example.com/');
+
+        $this->assertFalse($report->hasIssues());
+        $this->assertNotContains('https://other.com/gone', $this->requestedUrls);
+    }
+
     public function testExternalLinksAreLeftAloneWhenCheckingThemIsOff(): void
     {
         $report = $this->audit(

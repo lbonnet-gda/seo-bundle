@@ -6,6 +6,7 @@ namespace Lbonnet\SeoBundle\Module\Technical;
 
 use Lbonnet\SeoBundle\Html\HtmlPageParser;
 use Lbonnet\SeoBundle\Http\PageFetcher;
+use Lbonnet\SeoBundle\Model\DisabledChecks;
 use Lbonnet\SeoBundle\Model\Issue;
 use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\RedirectHop;
@@ -18,8 +19,7 @@ final class UrlVariantAuditor implements UrlVariantAuditorInterface
 {
     private const INDEX_FILES = ['index.php', 'index.html'];
 
-    /** @var array<string, true> */
-    private readonly array $disabledChecks;
+    private readonly DisabledChecks $disabledChecks;
 
     /**
      * @param list<string> $disabledChecks IssueType values whose variants are not even requested
@@ -31,13 +31,7 @@ final class UrlVariantAuditor implements UrlVariantAuditorInterface
         array $disabledChecks = [],
         private readonly ?RobotsTxtCheckerInterface $robotsTxtChecker = null,
     ) {
-        $disabled = [];
-
-        foreach ($disabledChecks as $check) {
-            $disabled[$check] = true;
-        }
-
-        $this->disabledChecks = $disabled;
+        $this->disabledChecks = new DisabledChecks($disabledChecks);
     }
 
     public function audit(array $pages, CrawlContext $context): array
@@ -143,7 +137,7 @@ final class UrlVariantAuditor implements UrlVariantAuditorInterface
         string $message,
         CrawlContext $context,
     ): ?PageAudit {
-        if (isset($this->disabledChecks[$type->value])) {
+        if ($this->disabledChecks->has($type)) {
             return null;
         }
 

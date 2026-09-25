@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lbonnet\SeoBundle\Module\Links;
 
 use Lbonnet\SeoBundle\Crawl\CrawlResult;
+use Lbonnet\SeoBundle\Model\DisabledChecks;
 use Lbonnet\SeoBundle\Model\Issue;
 use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\Module;
@@ -17,9 +18,18 @@ use Lbonnet\SeoBundle\Url\UrlResolver;
 
 final class LinksModule implements ModuleInterface
 {
+    private const EXTERNAL_CHECKS = [IssueType::BrokenExternalLink, IssueType::ExternalLinkLikelyBlocked];
+
+    private readonly DisabledChecks $disabledChecks;
+
+    /**
+     * @param list<string> $disabledChecks IssueType values the user turned off
+     */
     public function __construct(
         private readonly UrlCheckerInterface $urlChecker,
+        array $disabledChecks = [],
     ) {
+        $this->disabledChecks = new DisabledChecks($disabledChecks);
     }
 
     public function module(): Module
@@ -50,7 +60,7 @@ final class LinksModule implements ModuleInterface
             }
         }
 
-        if ($options->checkExternal) {
+        if ($options->checkExternal && !$this->disabledChecks->hasAll(self::EXTERNAL_CHECKS)) {
             foreach ($crawl->externalLinks() as $url => $entries) {
                 $result = $this->urlChecker->check($url);
 

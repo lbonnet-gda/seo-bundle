@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle\Module\Technical;
 
+use Lbonnet\SeoBundle\Model\DisabledChecks;
 use Lbonnet\SeoBundle\Model\Issue;
 use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\PageResponse;
@@ -43,8 +44,7 @@ final class SitemapAuditor implements SitemapAuditorInterface
         IssueType::SitemapUrlNotCanonical,
     ];
 
-    /** @var array<string, true> */
-    private readonly array $disabledChecks;
+    private readonly DisabledChecks $disabledChecks;
 
     /** @var array<string, PageAudit> URL => entry being built during an audit */
     private array $entries = [];
@@ -59,13 +59,7 @@ final class SitemapAuditor implements SitemapAuditorInterface
         private readonly int $maxFiles = 10,
         array $disabledChecks = [],
     ) {
-        $disabled = [];
-
-        foreach ($disabledChecks as $check) {
-            $disabled[$check] = true;
-        }
-
-        $this->disabledChecks = $disabled;
+        $this->disabledChecks = new DisabledChecks($disabledChecks);
     }
 
     public function audit(array $pages, CrawlContext $context): array
@@ -74,7 +68,9 @@ final class SitemapAuditor implements SitemapAuditorInterface
         $startPage = self::startPage($pages);
         $parts = $startPage !== null ? parse_url($startPage->url) : null;
 
-        if (!is_array($parts) || !isset($parts['scheme'], $parts['host']) || $this->areAllDisabled(self::CHECKS)) {
+        if (!is_array($parts) || !isset($parts['scheme'], $parts['host']) || $this->disabledChecks->hasAll(
+                self::CHECKS
+            )) {
             return [];
         }
 
@@ -104,7 +100,7 @@ final class SitemapAuditor implements SitemapAuditorInterface
             }
         }
 
-        if ($isComplete && !$this->isDisabled(IssueType::PageMissingFromSitemap)) {
+        if ($isComplete && !$this->disabledChecks->has(IssueType::PageMissingFromSitemap)) {
             $this->auditMissingPages($pages, $listedUrls, $context, $robotsTxt, $host);
         }
 
@@ -265,7 +261,7 @@ final class SitemapAuditor implements SitemapAuditorInterface
         ?RobotsTxt $robotsTxt,
     ): ?Issue {
         if (self::isBlockedForGooglebot($url, $robotsTxt)) {
-            if ($this->isDisabled(IssueType::SitemapUrlBlockedByRobotsTxt)) {
+            if ($this->disabledChecks->has(IssueType::SitemapUrlBlockedByRobotsTxt)) {
                 return null;
             }
 
@@ -275,7 +271,7 @@ final class SitemapAuditor implements SitemapAuditorInterface
             );
         }
 
-        if ($this->areAllDisabled(self::RESPONSE_CHECKS)) {
+        if ($this->disabledChecks->hasAll(self::RESPONSE_CHECKS)) {
             return null;
         }
 
@@ -455,22 +451,4 @@ final class SitemapAuditor implements SitemapAuditorInterface
         return $startPage;
     }
 
-    private function isDisabled(IssueType $type): bool
-    {
-        return isset($this->disabledChecks[$type->value]);
-    }
-
-    /**
-     * @param list<IssueType> $types
-     */
-    private function areAllDisabled(array $types): bool
-    {
-        foreach ($types as $type) {
-            if (!$this->isDisabled($type)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }

@@ -1,8 +1,9 @@
 # Checks
 
-Every issue carries a **severity**, and only `error` breaks a build by default (see `fail_on`). Any check can be
-left out of the report entirely with `disabled_checks`; for the URL variant and sitemap checks, a disabled check
-also sends no request.
+Every issue carries a **severity**, and only `error` breaks a build by default (see `fail_on`). Any check can be left
+out of the report entirely with `disabled_checks`, and whatever request only that check needed is then never sent:
+canonical and hreflang targets, external links, URL variants, and sitemaps are all requested only if a check still wants
+the answer.
 
 ### Links
 

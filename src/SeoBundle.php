@@ -49,7 +49,7 @@ final class SeoBundle extends AbstractBundle
 
         $children->arrayNode('disabled_checks')
             ->info(
-                'Checks to leave out of the report entirely, by issue type (e.g. "image_missing_alt"). A disabled check sends no request.'
+                'Checks to leave out of the report entirely, by issue type (e.g. "image_missing_alt"). Whatever request only a disabled check needed is then never sent.'
             )
             ->scalarPrototype()
             ->validate()

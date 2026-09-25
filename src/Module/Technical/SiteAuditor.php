@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle\Module\Technical;
 
+use Lbonnet\SeoBundle\Model\DisabledChecks;
 use Lbonnet\SeoBundle\Model\Issue;
 use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\PageResponse;
@@ -22,8 +23,19 @@ final class SiteAuditor implements SiteAuditorInterface
 {
     private const GOOGLEBOT = 'Googlebot';
 
-    /** @var array<string, true> */
-    private readonly array $disabledChecks;
+    private const CANONICAL_TARGET_CHECKS = [
+        IssueType::CanonicalTargetNotOk,
+        IssueType::CanonicalTargetRedirects,
+        IssueType::CanonicalTargetNoindex,
+    ];
+
+    private const HREFLANG_TARGET_CHECKS = [
+        IssueType::HreflangTargetNotOk,
+        IssueType::HreflangTargetRedirects,
+        IssueType::HreflangTargetNoindex,
+    ];
+
+    private readonly DisabledChecks $disabledChecks;
 
     /**
      * @param list<string> $disabledChecks IssueType values to drop from the report
@@ -36,13 +48,7 @@ final class SiteAuditor implements SiteAuditorInterface
         private readonly ?UrlVariantAuditorInterface $urlVariantAuditor = null,
         private readonly ?SitemapAuditorInterface $sitemapAuditor = null,
     ) {
-        $disabled = [];
-
-        foreach ($disabledChecks as $check) {
-            $disabled[$check] = true;
-        }
-
-        $this->disabledChecks = $disabled;
+        $this->disabledChecks = new DisabledChecks($disabledChecks);
     }
 
     public function audit(array $pages, CrawlContext $context, bool $reportDeadRedirects = true): array
@@ -169,7 +175,8 @@ final class SiteAuditor implements SiteAuditorInterface
             ];
         }
 
-        $response = self::crawledResponse($target, $context) ?? $this->probe->probe($target);
+        $response = self::crawledResponse($target, $context)
+            ?? ($this->disabledChecks->hasAll(self::CANONICAL_TARGET_CHECKS) ? null : $this->probe->probe($target));
 
         if ($response === null) {
             return [];
@@ -325,7 +332,8 @@ final class SiteAuditor implements SiteAuditorInterface
                 continue;
             }
 
-            $response = self::crawledResponse($target, $context) ?? $this->probe->probe($target);
+            $response = self::crawledResponse($target, $context)
+                ?? ($this->disabledChecks->hasAll(self::HREFLANG_TARGET_CHECKS) ? null : $this->probe->probe($target));
 
             if ($response === null) {
                 continue;
@@ -606,16 +614,7 @@ final class SiteAuditor implements SiteAuditorInterface
 
     private function withoutDisabledChecks(PageAudit $page): PageAudit
     {
-        if ($this->disabledChecks === []) {
-            return $page;
-        }
-
-        $kept = array_values(
-            array_filter(
-                $page->issues,
-                fn(Issue $issue): bool => !isset($this->disabledChecks[$issue->type->value]),
-            )
-        );
+        $kept = $this->disabledChecks->filter($page->issues);
 
         return count($kept) === count($page->issues) ? $page : $page->withIssues($kept);
     }

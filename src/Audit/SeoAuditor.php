@@ -9,7 +9,7 @@ use Lbonnet\SeoBundle\Crawl\CrawlResult;
 use Lbonnet\SeoBundle\Crawl\SiteCrawler;
 use Lbonnet\SeoBundle\Event\SeoAuditCompletedEvent;
 use Lbonnet\SeoBundle\Http\SiteThrottleExemption;
-use Lbonnet\SeoBundle\Model\Issue;
+use Lbonnet\SeoBundle\Model\DisabledChecks;
 use Lbonnet\SeoBundle\Model\Module;
 use Lbonnet\SeoBundle\Model\PageReport;
 use Lbonnet\SeoBundle\Model\SeoReport;
@@ -29,8 +29,7 @@ final class SeoAuditor implements SeoAuditorInterface
     /** @var list<ModuleInterface> */
     private readonly array $modules;
 
-    /** @var array<string, true> */
-    private readonly array $disabledChecks;
+    private readonly DisabledChecks $disabledChecks;
 
     /**
      * @param iterable<ModuleInterface> $modules the enabled modules
@@ -58,13 +57,7 @@ final class SeoAuditor implements SeoAuditorInterface
 
         $this->modules = $moduleList;
 
-        $disabled = [];
-
-        foreach ($disabledChecks as $check) {
-            $disabled[$check] = true;
-        }
-
-        $this->disabledChecks = $disabled;
+        $this->disabledChecks = new DisabledChecks($disabledChecks);
     }
 
     public function audit(
@@ -191,12 +184,12 @@ final class SeoAuditor implements SeoAuditorInterface
             $page = $pages[$key] ?? null;
 
             if ($page !== null && UrlResolver::isSameUrl($page->url, $entry->url)) {
-                $pages[$key] = $page->withAddedIssues($this->withoutDisabledChecks($entry->issues));
+                $pages[$key] = $page->withAddedIssues($this->disabledChecks->filter($entry->issues));
 
                 continue;
             }
 
-            $issues = $this->withoutDisabledChecks($entry->issues);
+            $issues = $this->disabledChecks->filter($entry->issues);
 
             if ($issues !== []) {
                 $others[] = $entry->withIssues($issues);
@@ -204,22 +197,6 @@ final class SeoAuditor implements SeoAuditorInterface
         }
 
         return [...array_values($pages), ...$others];
-    }
-
-    /**
-     * @param list<Issue> $issues
-     *
-     * @return list<Issue>
-     */
-    private function withoutDisabledChecks(array $issues): array
-    {
-        if ($this->disabledChecks === []) {
-            return $issues;
-        }
-
-        return array_values(
-            array_filter($issues, fn(Issue $issue): bool => !isset($this->disabledChecks[$issue->type->value]))
-        );
     }
 
     /**
