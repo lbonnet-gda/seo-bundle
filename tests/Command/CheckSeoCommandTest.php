@@ -28,7 +28,7 @@ final class CheckSeoCommandTest extends TestCase
 
     public function testItRejectsAnUnknownFailOnValue(): void
     {
-        $tester = $this->tester(new SeoReport('https://example.com'));
+        $tester = $this->testerAuditingNothing();
 
         $this->assertSame(Command::INVALID, $tester->execute(['--fail-on' => 'critical']));
         $this->assertStringContainsString('Invalid --fail-on value', $tester->getDisplay());
@@ -36,7 +36,7 @@ final class CheckSeoCommandTest extends TestCase
 
     public function testItRejectsAnUnknownModule(): void
     {
-        $tester = $this->tester(new SeoReport('https://example.com'));
+        $tester = $this->testerAuditingNothing();
 
         $this->assertSame(Command::INVALID, $tester->execute(['--only' => 'links,sitemaps']));
         $this->assertStringContainsString('Invalid --only module "sitemaps"', $tester->getDisplay());
@@ -113,7 +113,7 @@ final class CheckSeoCommandTest extends TestCase
             new SeoReport('https://example.com', pagesRead: 25, truncated: true, blockedByRobotsTxt: true),
         );
 
-        $tester->execute([]);
+        $this->assertSame(Command::SUCCESS, $tester->execute([]));
 
         $display = $tester->getDisplay();
         $this->assertStringContainsString('answers a server error', $display);
@@ -128,6 +128,14 @@ final class CheckSeoCommandTest extends TestCase
             pagesRead: 1,
             totalDuration: 0.15,
         );
+    }
+
+    private function testerAuditingNothing(): CommandTester
+    {
+        $auditor = $this->createMock(SeoAuditorInterface::class);
+        $auditor->expects($this->never())->method('audit');
+
+        return new CommandTester(new CheckSeoCommand($auditor, defaultBaseUrl: 'https://example.com'));
     }
 
     private function tester(SeoReport $report): CommandTester

@@ -9,6 +9,7 @@ use Lbonnet\SeoBundle\EventListener\StoreReportListener;
 use Lbonnet\SeoBundle\Model\SeoReport;
 use Lbonnet\SeoBundle\Storage\ReportStorageInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 
 final class StoreReportListenerTest extends TestCase
@@ -23,14 +24,18 @@ final class StoreReportListenerTest extends TestCase
             ->with($report)
             ->willReturn('/tmp/report.json');
 
-        (new StoreReportListener($storage))(new SeoAuditCompletedEvent($report));
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('info')->with($this->stringContains('/tmp/report.json'));
+
+        (new StoreReportListener($storage, $logger))(new SeoAuditCompletedEvent($report));
     }
 
     public function testItDoesNothingWithoutStorage(): void
     {
-        $this->expectNotToPerformAssertions();
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->never())->method($this->anything());
 
-        (new StoreReportListener())(new SeoAuditCompletedEvent(new SeoReport('https://example.com/')));
+        (new StoreReportListener(logger: $logger))(new SeoAuditCompletedEvent(new SeoReport('https://example.com/')));
     }
 
     public function testAStorageFailureDoesNotBubbleUp(): void
@@ -38,8 +43,9 @@ final class StoreReportListenerTest extends TestCase
         $storage = $this->createMock(ReportStorageInterface::class);
         $storage->method('save')->willThrowException(new RuntimeException('Disk full'));
 
-        (new StoreReportListener($storage))(new SeoAuditCompletedEvent(new SeoReport('https://example.com/')));
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with($this->stringContains('Disk full'));
 
-        $this->addToAssertionCount(1);
+        (new StoreReportListener($storage, $logger))(new SeoAuditCompletedEvent(new SeoReport('https://example.com/')));
     }
 }
