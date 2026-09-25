@@ -8,6 +8,7 @@ use Lbonnet\SeoBundle\Audit\SeoAuditorInterface;
 use Lbonnet\SeoBundle\Model\Module;
 use Lbonnet\SeoBundle\Model\SeoReport;
 use Lbonnet\SeoBundle\Model\Severity;
+use Lbonnet\SeoBundle\Url\UrlPattern;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\LockableTrait;
@@ -125,6 +126,19 @@ final class CheckSeoCommand extends Command
             $maxPagesOption = $input->getOption('max-pages');
             /** @var list<string> $excludePatterns */
             $excludePatterns = (array)$input->getOption('exclude');
+            $invalidPatterns = UrlPattern::invalidOnes($excludePatterns);
+
+            if ($invalidPatterns !== []) {
+                $io->error(
+                    sprintf(
+                        'Invalid --exclude pattern(s): %s. A pattern is a regular expression, delimiters included, '
+                        .'as in "#/admin#".',
+                        implode(', ', $invalidPatterns),
+                    )
+                );
+
+                return Command::INVALID;
+            }
 
             $io->title('SEO Audit');
             $io->text(sprintf('Starting crawl on: <info>%s</info>', $startUrl));

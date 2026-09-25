@@ -58,6 +58,19 @@ final class CheckSeoMessageHandlerTest extends TestCase
         (new CheckSeoMessageHandler($auditor, logger: $logger))(new CheckSeoMessage());
     }
 
+    public function testItRejectsAnInvalidExcludePattern(): void
+    {
+        $auditor = $this->createMock(SeoAuditorInterface::class);
+        $auditor->expects($this->never())->method('audit');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with($this->stringContains('/oops'));
+
+        (new CheckSeoMessageHandler($auditor, 'https://example.com', $logger))(
+            new CheckSeoMessage(excludePatterns: ['/oops'])
+        );
+    }
+
     public function testItRejectsAnUnknownModule(): void
     {
         $auditor = $this->createMock(SeoAuditorInterface::class);

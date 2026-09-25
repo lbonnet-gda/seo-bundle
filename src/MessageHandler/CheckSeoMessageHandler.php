@@ -7,6 +7,7 @@ namespace Lbonnet\SeoBundle\MessageHandler;
 use Lbonnet\SeoBundle\Audit\SeoAuditorInterface;
 use Lbonnet\SeoBundle\Message\CheckSeoMessage;
 use Lbonnet\SeoBundle\Model\Module;
+use Lbonnet\SeoBundle\Url\UrlPattern;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -27,6 +28,16 @@ final class CheckSeoMessageHandler
 
         if ($startUrl === null || trim($startUrl) === '') {
             $this->logger->error('[Seo] No base URL configured or provided in CheckSeoMessage.');
+
+            return;
+        }
+
+        $invalidPatterns = UrlPattern::invalidOnes($message->excludePatterns);
+
+        if ($invalidPatterns !== []) {
+            $this->logger->error(
+                sprintf('[Seo] Invalid exclude pattern(s) in CheckSeoMessage: %s.', implode(', ', $invalidPatterns))
+            );
 
             return;
         }

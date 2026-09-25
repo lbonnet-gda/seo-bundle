@@ -11,6 +11,7 @@ use DOMXPath;
 use Lbonnet\SeoBundle\Model\HreflangLink;
 use Lbonnet\SeoBundle\Model\PageLink;
 use Lbonnet\SeoBundle\Model\PageSignals;
+use Lbonnet\SeoBundle\Url\UrlPattern;
 use Lbonnet\SeoBundle\Url\UrlResolver;
 
 final class HtmlPageParser
@@ -144,7 +145,7 @@ final class HtmlPageParser
                 continue;
             }
 
-            if (self::isExcluded($url, $excludePatterns)) {
+            if (UrlPattern::matchesAny($url, $excludePatterns)) {
                 continue;
             }
 
@@ -167,20 +168,6 @@ final class HtmlPageParser
         }
 
         return preg_match('#^[a-z][a-z0-9+.-]*:#i', $href) === 1 && preg_match('#^https?:#i', $href) !== 1;
-    }
-
-    /**
-     * @param list<string> $patterns
-     */
-    private static function isExcluded(string $url, array $patterns): bool
-    {
-        foreach ($patterns as $pattern) {
-            if (@preg_match($pattern, $url) === 1) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static function document(string $html): DOMDocument

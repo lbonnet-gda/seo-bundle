@@ -10,6 +10,7 @@ use Lbonnet\SeoBundle\Http\RedirectChainResolverInterface;
 use Lbonnet\SeoBundle\Http\SiteThrottleExemption;
 use Lbonnet\SeoBundle\Model\RedirectChain;
 use Lbonnet\SeoBundle\Robots\RobotsTxtCheckerInterface;
+use Lbonnet\SeoBundle\Url\UrlPattern;
 use Lbonnet\SeoBundle\Url\UrlResolver;
 
 final class SiteCrawler
@@ -162,13 +163,8 @@ final class SiteCrawler
             return false;
         }
 
-        foreach ($excludePatterns as $pattern) {
-            if (@preg_match($pattern, $url) === 1) {
-                return false;
-            }
-        }
-
-        return $this->robotsTxtChecker?->isAllowed($url) !== false;
+        return !UrlPattern::matchesAny($url, $excludePatterns)
+            && $this->robotsTxtChecker?->isAllowed($url) !== false;
     }
 
     private static function hostOf(string $url): ?string

@@ -193,6 +193,14 @@ final class SeoBundleTest extends TestCase
         $this->load(['seo' => ['disabled_checks' => ['not_a_real_check']]]);
     }
 
+    public function testAnInvalidExcludePatternIsRejected(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessageMatches('/valid regular expression/');
+
+        $this->load(['seo' => ['crawl' => ['exclude_patterns' => ['#/admin#', '/admin']]]]);
+    }
+
     public function testAnUnknownFailOnValueIsRejected(): void
     {
         $this->expectException(InvalidConfigurationException::class);

@@ -39,5 +39,7 @@ seo:
         max_reports: 30 # oldest reports are deleted past this count per audited URL (0 = keep forever)
 ```
 
-`disabled_checks` values are validated against the known issue types at container build time, so a typo fails fast
-instead of silently disabling nothing.
+`disabled_checks` values are validated against the known issue types at container build time, and `exclude_patterns`
+entries against the regex engine, so a typo fails fast instead of silently doing nothing. A pattern missing its
+delimiters — `'/admin'` instead of `'#/admin#'` — would otherwise exclude no URL at all. Patterns passed to the
+command or to `CheckSeoMessage` are checked the same way.

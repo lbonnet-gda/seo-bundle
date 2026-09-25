@@ -13,6 +13,7 @@ use Lbonnet\SeoBundle\Module\OnPage\OnPageModule;
 use Lbonnet\SeoBundle\Module\Technical\TechnicalModule;
 use Lbonnet\SeoBundle\Storage\JsonFileReportStorage;
 use Lbonnet\SeoBundle\Storage\ReportStorageInterface;
+use Lbonnet\SeoBundle\Url\UrlPattern;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\NodeBuilder;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -168,8 +169,13 @@ final class SeoBundle extends AbstractBundle
             ->end();
 
         $crawl->arrayNode('exclude_patterns')
-            ->info('Regular expression patterns for URLs to skip.')
-            ->scalarPrototype()->end();
+            ->info('Regular expression patterns for URLs to skip, delimiters included (e.g. "#/admin#").')
+            ->scalarPrototype()
+            ->validate()
+            ->ifTrue(static fn(mixed $value): bool => !is_string($value) || !UrlPattern::isValid($value))
+            ->thenInvalid('%s is not a valid regular expression. Did you forget its delimiters, as in "#/admin#"?')
+            ->end()
+            ->end();
 
         $crawl->integerNode('request_delay_ms')
             ->defaultValue(200)

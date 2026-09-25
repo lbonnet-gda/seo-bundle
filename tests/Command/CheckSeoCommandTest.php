@@ -34,6 +34,14 @@ final class CheckSeoCommandTest extends TestCase
         $this->assertStringContainsString('Invalid --fail-on value', $tester->getDisplay());
     }
 
+    public function testItRejectsAnInvalidExcludePattern(): void
+    {
+        $tester = $this->testerAuditingNothing();
+
+        $this->assertSame(Command::INVALID, $tester->execute(['--exclude' => ['#/admin#', '/oops']]));
+        $this->assertStringContainsString('Invalid --exclude pattern(s): /oops', $tester->getDisplay());
+    }
+
     public function testItRejectsAnUnknownModule(): void
     {
         $tester = $this->testerAuditingNothing();
