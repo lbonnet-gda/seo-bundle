@@ -8,6 +8,7 @@ use Lbonnet\SeoBundle\Http\PageFetcher;
 use Lbonnet\SeoBundle\Http\RedirectChainResolver;
 use Lbonnet\SeoBundle\Http\RedirectChainResolverInterface;
 use Lbonnet\SeoBundle\MessageHandler\CheckSeoMessageHandler;
+use Lbonnet\SeoBundle\Module\OnPage\PageAuditor as OnPagePageAuditor;
 use Lbonnet\SeoBundle\Module\Technical\Http\HttpTargetProbe;
 use Lbonnet\SeoBundle\Module\Technical\Http\SitemapFetcher;
 use Lbonnet\SeoBundle\Module\Technical\SiteAuditor;
@@ -62,6 +63,10 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$defaultExcludePatterns', param('seo.crawl.exclude_patterns'))
         ->arg('$defaultCheckExternal', param('seo.links.check_external'))
         ->arg('$disabledChecks', param('seo.disabled_checks'));
+
+    $services->set(OnPagePageAuditor::class)
+        ->arg('$maxTitleLength', param('seo.on_page.max_title_length'))
+        ->arg('$maxDescriptionLength', param('seo.on_page.max_description_length'));
 
     $services->set(HttpTargetProbe::class)
         ->arg('$enabled', param('seo.technical.resolve_external_targets'))
