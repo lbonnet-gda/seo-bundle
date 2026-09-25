@@ -17,6 +17,7 @@ Unless `storage.dir` is disabled, each audit is stored as JSON:
     "truncated": false,
     "blockedByRobotsTxt": false,
     "startUrlStatusCode": null,
+    "urlsDisallowedByRobotsTxt": 0,
     "issuesCount": 6,
     "issuesBySeverity": {
         "error": 2,
@@ -55,6 +56,10 @@ Unless `storage.dir` is disabled, each audit is stored as JSON:
 `startUrlStatusCode` is null as long as the audit read at least one page. When it read none — the start URL
 answers an error, redirects to one, or cannot be requested at all (then `0`) — it carries that status, the
 console command fails, and nothing else in the report is meaningful.
+
+`urlsDisallowedByRobotsTxt` counts the internal URLs the crawl left out because `robots.txt` disallows them for
+the configured user agent. They are audited by nobody, so the console command says so rather than letting the report
+look complete.
 
 `pagesRead` counts the HTML pages parsed; `urlsChecked` counts what the crawl itself requested, redirect hops
 included. The extra requests the modules make afterward — external links, sitemaps, URL variants, canonical and

@@ -102,3 +102,7 @@ final class SeoNotificationListener
     }
 }
 ```
+
+The event carries the whole report, so any other use — a CSV export, a POST to an internal API, a daily digest — is a
+listener of this shape. To replace the stored JSON rather than add to it, implement `ReportStorageInterface` and point
+the interface alias at your own service.
