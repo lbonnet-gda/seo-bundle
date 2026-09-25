@@ -17,6 +17,8 @@ final class DuplicateContentAuditor
      */
     public function audit(array $pages): array
     {
+        $pages = array_values(array_filter($pages, static fn(CrawledPage $page): bool => self::isIndexable($page)));
+
         $titleCounts = self::countDuplicates(
             $pages,
             static fn(CrawledPage $page): ?string => $page->signals->title,
@@ -60,6 +62,13 @@ final class DuplicateContentAuditor
         }
 
         return $issues;
+    }
+
+    private static function isIndexable(CrawledPage $page): bool
+    {
+        return !$page->signals->metaRobotsDirectives()->hasNoindex()
+            && !$page->response->headerRobotsDirectives()->hasNoindex()
+            && $page->canonicalElsewhere() === null;
     }
 
     /**

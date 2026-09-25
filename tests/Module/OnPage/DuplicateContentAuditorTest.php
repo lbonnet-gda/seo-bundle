@@ -52,6 +52,18 @@ final class DuplicateContentAuditorTest extends TestCase
         );
     }
 
+    public function testPagesSearchEnginesIgnoreAreNotDuplicates(): void
+    {
+        $issues = (new DuplicateContentAuditor())->audit([
+            self::page('https://example.com/blog', title: 'Same title'),
+            self::page('https://example.com/blog?p=2', title: 'Same title', metaRobots: ['noindex, follow']),
+            self::page('https://example.com/blog?p=3', title: 'Same title', headerRobots: ['noindex']),
+            self::page('https://example.com/blog?sort=asc', title: 'Same title', canonical: 'https://example.com/blog'),
+        ]);
+
+        $this->assertSame([], $issues);
+    }
+
     public function testPagesWithoutATitleOrDescriptionAreNotDuplicates(): void
     {
         $issues = (new DuplicateContentAuditor())->audit([
@@ -63,13 +75,32 @@ final class DuplicateContentAuditorTest extends TestCase
         $this->assertSame([], $issues);
     }
 
-    private static function page(string $url, ?string $title = null, ?string $description = null): CrawledPage
-    {
+    /**
+     * @param list<string> $metaRobots
+     * @param list<string> $headerRobots
+     */
+    private static function page(
+        string $url,
+        ?string $title = null,
+        ?string $description = null,
+        array $metaRobots = [],
+        array $headerRobots = [],
+        ?string $canonical = null,
+    ): CrawledPage {
         return new CrawledPage(
             url: $url,
             depth: 0,
-            response: new PageResponse($url, Response::HTTP_OK),
-            signals: new PageSignals(title: $title, metaDescription: $description),
+            response: new PageResponse(
+                $url,
+                Response::HTTP_OK,
+                $headerRobots !== [] ? ['x-robots-tag' => $headerRobots] : [],
+            ),
+            signals: new PageSignals(
+                canonicalHrefs: $canonical !== null ? [$canonical] : [],
+                metaRobots: $metaRobots,
+                title: $title,
+                metaDescription: $description,
+            ),
         );
     }
 

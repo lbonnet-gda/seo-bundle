@@ -30,7 +30,9 @@ after the crawl: a HEAD, then a GET retry when the answer suggests the server mi
 | `multiple_h1`           | notice   | The page has several `<h1>`                                    |
 | `image_missing_alt`     | warning  | An `<img>` without an `alt` attribute                          |
 
-Read from the page itself, except the two duplicate checks, which compare every crawled page with the others.
+Read from the page itself, except the two duplicate checks, which compare every crawled page with the others. Those two
+leave out the pages search engines will not index anyway — a noindex directive, or a canonical pointing elsewhere —
+since sharing a title with them is not a duplicate-content problem.
 
 ### Canonical tags
 
