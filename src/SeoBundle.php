@@ -119,7 +119,8 @@ final class SeoBundle extends AbstractBundle
         }
 
         $builder->register('seo.http_client', ThrottledHttpClient::class)
-            ->setArguments([new Reference($privateNetworkGuardId), $config['crawl']['request_delay_ms']]);
+            ->setArguments([new Reference($privateNetworkGuardId), $config['crawl']['request_delay_ms']])
+            ->addTag('kernel.reset', ['method' => 'reset']);
 
         if (!$config['links']['enabled']) {
             $builder->removeDefinition(LinksModule::class);

@@ -99,7 +99,8 @@ return static function (ContainerConfigurator $container): void {
     $services->set(RobotsTxtChecker::class)
         ->arg('$httpClient', service('seo.http_client'))
         ->arg('$userAgent', param('seo.crawl.user_agent'))
-        ->arg('$enabled', param('seo.crawl.respect_robots_txt'));
+        ->arg('$enabled', param('seo.crawl.respect_robots_txt'))
+        ->tag('kernel.reset', ['method' => 'reset']);
 
     $services->alias(RobotsTxtCheckerInterface::class, RobotsTxtChecker::class);
     $services->alias(RobotsTxtProviderInterface::class, RobotsTxtChecker::class);

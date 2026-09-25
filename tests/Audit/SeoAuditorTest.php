@@ -15,6 +15,7 @@ use Lbonnet\SeoBundle\Model\Module;
 use Lbonnet\SeoBundle\Model\PageReport;
 use Lbonnet\SeoBundle\Model\SeoReport;
 use Lbonnet\SeoBundle\Module\ModuleInterface;
+use Lbonnet\SeoBundle\Robots\RobotsTxtChecker;
 use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
@@ -96,6 +97,16 @@ final class SeoAuditorTest extends TestCase
 
         $this->assertSame(3, $report->pagesRead);
         $this->assertNull($report->startUrlStatusCode);
+    }
+
+    public function testRereadsRobotsTxtOnEveryAudit(): void
+    {
+        $auditor = $this->auditor([new FakeModule(Module::Links)], robotsTxtChecker: true);
+
+        $auditor->audit('https://example.com/');
+        $auditor->audit('https://example.com/');
+
+        $this->assertCount(2, array_keys($this->requestedUrls, 'https://example.com/robots.txt', true));
     }
 
     public function testRunsOnlyTheRequestedModules(): void
@@ -191,6 +202,7 @@ final class SeoAuditorTest extends TestCase
         array $disabledChecks = [],
         ?EventDispatcherInterface $dispatcher = null,
         ?LoggerInterface $logger = null,
+        bool $robotsTxtChecker = false,
     ): SeoAuditor {
         $httpClient = new MockHttpClient(function (string $method, string $url): MockResponse {
             $this->requestedUrls[] = $url;
@@ -218,11 +230,17 @@ final class SeoAuditorTest extends TestCase
             );
         });
         $pageFetcher = new PageFetcher($httpClient);
+        $robots = $robotsTxtChecker ? new RobotsTxtChecker($httpClient, 'TestBot/1.0') : null;
 
         return new SeoAuditor(
-            crawler: new SiteCrawler($pageFetcher, new RedirectChainResolver($pageFetcher)),
+            crawler: new SiteCrawler(
+                $pageFetcher,
+                new RedirectChainResolver($pageFetcher),
+                robotsTxtChecker: $robots,
+            ),
             httpClient: $httpClient,
             modules: $modules,
+            robotsTxtChecker: $robots,
             eventDispatcher: $dispatcher,
             defaultMaxPages: $defaultMaxPages,
             defaultExcludePatterns: $defaultExcludePatterns,

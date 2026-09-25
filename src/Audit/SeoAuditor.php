@@ -21,6 +21,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
 
 final class SeoAuditor implements SeoAuditorInterface
@@ -86,6 +87,10 @@ final class SeoAuditor implements SeoAuditorInterface
             progressCallback: $progressCallback !== null ? $progressCallback(...) : null,
         );
         $moduleOptions = new ModuleOptions(checkExternal: $checkExternal ?? $this->defaultCheckExternal);
+
+        if ($this->robotsTxtChecker instanceof ResetInterface) {
+            $this->robotsTxtChecker->reset();
+        }
 
         // Modules request the audited site too (probes, URL variants, sitemaps): the exemption covers them.
         $throttleExemption = SiteThrottleExemption::begin($this->httpClient, $startUrl, $this->robotsTxtChecker);

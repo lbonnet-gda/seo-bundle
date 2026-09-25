@@ -8,15 +8,16 @@ use Lbonnet\SeoBundle\Http\BoundedContentReader;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
 
-final class RobotsTxtChecker implements RobotsTxtCheckerInterface, RobotsTxtProviderInterface
+final class RobotsTxtChecker implements RobotsTxtCheckerInterface, RobotsTxtProviderInterface, ResetInterface
 {
     private const MAX_CONTENT_LENGTH = 500_000;
     private const MAX_REDIRECTS = 5;
 
-    /** @var array<string, RobotsTxt> */
-    private array $robotsTxtByHost = [];
+    /** @var array<string, RobotsTxt> origin (scheme, host and port) => its robots.txt, fetched once per audit */
+    private array $robotsTxtByOrigin = [];
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -54,18 +55,39 @@ final class RobotsTxtChecker implements RobotsTxtCheckerInterface, RobotsTxtProv
 
     public function robotsTxt(string $url): ?RobotsTxt
     {
-        $host = parse_url($url, PHP_URL_HOST);
-        if (!is_string($host) || $host === '') {
+        $origin = self::originOf($url);
+
+        if ($origin === null) {
             return null;
         }
 
-        return $this->robotsTxtByHost[$host] ??= $this->fetch($url, $host);
+        return $this->robotsTxtByOrigin[$origin] ??= $this->fetch($origin);
     }
 
-    private function fetch(string $url, string $host): RobotsTxt
+    public function reset(): void
     {
-        $scheme = parse_url($url, PHP_URL_SCHEME) ?: 'https';
-        $robotsUrl = sprintf('%s://%s/robots.txt', $scheme, $host);
+        $this->robotsTxtByOrigin = [];
+    }
+
+    private static function originOf(string $url): ?string
+    {
+        $parts = parse_url($url);
+
+        if (!is_array($parts) || !isset($parts['host']) || $parts['host'] === '') {
+            return null;
+        }
+
+        return sprintf(
+            '%s://%s%s',
+            strtolower($parts['scheme'] ?? 'https'),
+            strtolower($parts['host']),
+            isset($parts['port']) ? ':'.$parts['port'] : '',
+        );
+    }
+
+    private function fetch(string $origin): RobotsTxt
+    {
+        $robotsUrl = $origin.'/robots.txt';
 
         try {
             $response = $this->httpClient->request(Request::METHOD_GET, $robotsUrl, [

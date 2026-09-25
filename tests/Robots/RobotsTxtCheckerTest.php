@@ -266,6 +266,47 @@ final class RobotsTxtCheckerTest extends TestCase
         $this->assertSame(5, $options['max_redirects']);
     }
 
+    public function testFetchesTheRobotsTxtOfTheUrlsOwnOrigin(): void
+    {
+        $requested = [];
+        $client = new MockHttpClient(static function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = $url;
+
+            return new MockResponse("User-agent: *\nDisallow: /private\n");
+        });
+        $checker = new RobotsTxtChecker($client, 'TestBot/1.0');
+
+        $checker->isAllowed('http://example.com:8000/page');
+        $checker->isAllowed('http://example.com:8000/other');
+        $checker->isAllowed('https://example.com/page');
+        $checker->isAllowed('https://EXAMPLE.com/page');
+
+        $this->assertSame(
+            ['http://example.com:8000/robots.txt', 'https://example.com/robots.txt'],
+            $requested,
+        );
+    }
+
+    public function testResetForgetsWhatWasLearnedAboutTheSite(): void
+    {
+        $calls = 0;
+        $client = new MockHttpClient(static function () use (&$calls): MockResponse {
+            $calls++;
+
+            return new MockResponse('', ['http_code' => Response::HTTP_SERVICE_UNAVAILABLE]);
+        });
+        $checker = new RobotsTxtChecker($client, 'TestBot/1.0');
+
+        $this->assertTrue($checker->isSiteBlocked('https://example.com/'));
+        $this->assertTrue($checker->isSiteBlocked('https://example.com/'));
+        $this->assertSame(1, $calls);
+
+        $checker->reset();
+
+        $this->assertTrue($checker->isSiteBlocked('https://example.com/'));
+        $this->assertSame(2, $calls);
+    }
+
     public function testThereIsNoRobotsTxtForAUrlWithoutHost(): void
     {
         $this->assertNull((new RobotsTxtChecker(new MockHttpClient(), 'TestBot/1.0'))->robotsTxt('/relative/path'));
