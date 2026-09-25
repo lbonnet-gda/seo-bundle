@@ -7,6 +7,7 @@ namespace Lbonnet\SeoBundle;
 use Lbonnet\SeoBundle\Http\ThrottledHttpClient;
 use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\Severity;
+use Lbonnet\SeoBundle\Module\Links\LinksModule;
 use Lbonnet\SeoBundle\Module\ModuleInterface;
 use Lbonnet\SeoBundle\Module\OnPage\OnPageModule;
 use Lbonnet\SeoBundle\Module\Technical\TechnicalModule;
@@ -118,6 +119,10 @@ final class SeoBundle extends AbstractBundle
 
         $builder->register('seo.http_client', ThrottledHttpClient::class)
             ->setArguments([new Reference($privateNetworkGuardId), $config['crawl']['request_delay_ms']]);
+
+        if (!$config['links']['enabled']) {
+            $builder->removeDefinition(LinksModule::class);
+        }
 
         if (!$config['on_page']['enabled']) {
             $builder->removeDefinition(OnPageModule::class);

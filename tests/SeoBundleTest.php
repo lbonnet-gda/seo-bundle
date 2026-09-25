@@ -11,6 +11,7 @@ use Lbonnet\SeoBundle\Crawl\SiteCrawler;
 use Lbonnet\SeoBundle\EventListener\StoreReportListener;
 use Lbonnet\SeoBundle\Http\ThrottledHttpClient;
 use Lbonnet\SeoBundle\MessageHandler\CheckSeoMessageHandler;
+use Lbonnet\SeoBundle\Module\Links\LinksModule;
 use Lbonnet\SeoBundle\Module\OnPage\OnPageModule;
 use Lbonnet\SeoBundle\Module\Technical\TechnicalModule;
 use Lbonnet\SeoBundle\Robots\RobotsTxtChecker;
@@ -160,7 +161,10 @@ final class SeoBundleTest extends TestCase
 
         $auditor = $container->findDefinition(SeoAuditorInterface::class);
         $this->assertSame(SeoAuditor::class, $auditor->getClass());
-        $this->assertSame([OnPageModule::class, TechnicalModule::class], self::moduleClasses($container, $auditor));
+        $this->assertSame(
+            [LinksModule::class, OnPageModule::class, TechnicalModule::class],
+            self::moduleClasses($container, $auditor),
+        );
 
         $httpClient = $auditor->getArgument(1);
         $httpClient = $httpClient instanceof Definition ? $httpClient : $container->findDefinition((string)$httpClient);
@@ -169,12 +173,13 @@ final class SeoBundleTest extends TestCase
 
     public function testADisabledModuleIsNotRegistered(): void
     {
-        $container = $this->load(['seo' => ['technical' => false, 'on_page' => false]]);
+        $container = $this->load(['seo' => ['links' => false, 'technical' => false, 'on_page' => false]]);
         $container->register(HttpClientInterface::class)->setSynthetic(true)->setPublic(true);
         $container->getAlias(SeoAuditorInterface::class)->setPublic(true);
 
         $this->assertFalse($container->hasDefinition(TechnicalModule::class));
         $this->assertFalse($container->hasDefinition(OnPageModule::class));
+        $this->assertFalse($container->hasDefinition(LinksModule::class));
 
         $container->compile();
 

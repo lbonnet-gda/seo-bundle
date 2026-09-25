@@ -8,6 +8,7 @@ use Lbonnet\SeoBundle\Http\PageFetcher;
 use Lbonnet\SeoBundle\Http\RedirectChainResolver;
 use Lbonnet\SeoBundle\Http\RedirectChainResolverInterface;
 use Lbonnet\SeoBundle\MessageHandler\CheckSeoMessageHandler;
+use Lbonnet\SeoBundle\Module\Links\UrlChecker;
 use Lbonnet\SeoBundle\Module\OnPage\PageAuditor as OnPagePageAuditor;
 use Lbonnet\SeoBundle\Module\Technical\Http\HttpTargetProbe;
 use Lbonnet\SeoBundle\Module\Technical\Http\SitemapFetcher;
@@ -42,6 +43,7 @@ return static function (ContainerConfigurator $container): void {
             '../src/Crawl/CrawledPage.php',
             '../src/Crawl/CrawlResult.php',
             '../src/Module/ModuleOptions.php',
+            '../src/Module/Links/Model/',
             '../src/Module/Technical/Model/',
             '../src/Module/Technical/Sitemap/',
             '../src/Module/Technical/Hreflang/',
@@ -63,6 +65,11 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$defaultExcludePatterns', param('seo.crawl.exclude_patterns'))
         ->arg('$defaultCheckExternal', param('seo.links.check_external'))
         ->arg('$disabledChecks', param('seo.disabled_checks'));
+
+    $services->set(UrlChecker::class)
+        ->arg('$httpClient', service('seo.http_client'))
+        ->arg('$defaultTimeout', param('seo.crawl.timeout'))
+        ->arg('$userAgent', param('seo.crawl.user_agent'));
 
     $services->set(OnPagePageAuditor::class)
         ->arg('$maxTitleLength', param('seo.on_page.max_title_length'))
