@@ -254,6 +254,16 @@ final class CheckSeoCommand extends Command
             );
         }
 
+        if ($report->urlsDisallowedByRobotsTxt > 0) {
+            $io->warning(
+                sprintf(
+                    '%d internal URL(s) were left out because robots.txt disallows them for this crawler. They are '
+                    .'not in the report. Set "seo.crawl.respect_robots_txt" to false to audit them anyway.',
+                    $report->urlsDisallowedByRobotsTxt
+                )
+            );
+        }
+
         if ($report->truncated) {
             $io->warning(
                 sprintf(

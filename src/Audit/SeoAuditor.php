@@ -116,6 +116,7 @@ final class SeoAuditor implements SeoAuditorInterface
             truncated: $crawl->truncated,
             blockedByRobotsTxt: $crawl->blockedByRobotsTxt,
             startUrlStatusCode: self::startUrlStatusCode($crawl),
+            urlsDisallowedByRobotsTxt: count($crawl->disallowedUrls()),
         );
 
         try {

@@ -38,6 +38,8 @@ final class SiteCrawler
         $chains = [];
         /** @var array<string, string> $unreachable */
         $unreachable = [];
+        /** @var array<string, string> $disallowed dedup key => internal URL robots.txt keeps us from reading */
+        $disallowed = [];
         /** @var list<CrawledPage> $pages */
         $pages = [];
         $urlsChecked = 0;
@@ -101,7 +103,7 @@ final class SiteCrawler
                     && $finalUrl !== null
                     && !$chain->isLoop
                     && $chain->finalStatusCode !== null
-                    && $this->isCrawlable($finalUrl, $siteHost, $options->excludePatterns)
+                    && $this->isCrawlable($finalUrl, $siteHost, $options->excludePatterns, $disallowed)
                 ) {
                     // A redirect from http:// to https:// lands on a URL sharing its dedup key: it is the page we
                     // came for, so it must be read even though that key is already marked visited.
@@ -134,11 +136,13 @@ final class SiteCrawler
             }
 
             foreach ($signals->links as $link) {
-                if (
-                    $link->isExternal
-                    || isset($visited[UrlResolver::dedupKey($link->url)])
-                    || $this->robotsTxtChecker?->isAllowed($link->url) === false
-                ) {
+                if ($link->isExternal || isset($visited[UrlResolver::dedupKey($link->url)])) {
+                    continue;
+                }
+
+                if ($this->isDisallowed($link->url)) {
+                    $disallowed[UrlResolver::dedupKey($link->url)] = $link->url;
+
                     continue;
                 }
 
@@ -153,6 +157,7 @@ final class SiteCrawler
             responses: $responses,
             redirectChains: $chains,
             unreachable: $unreachable,
+            disallowed: $disallowed,
             urlsChecked: $urlsChecked,
             truncated: $truncated,
             blockedByRobotsTxt: $this->robotsTxtChecker?->isSiteBlocked($siteUrl) === true,
@@ -162,7 +167,11 @@ final class SiteCrawler
     /**
      * @param list<string> $excludePatterns
      */
-    private function isCrawlable(string $url, ?string $siteHost, array $excludePatterns): bool
+    /**
+     * @param list<string> $excludePatterns
+     * @param array<string, string> $disallowed collects what robots.txt keeps out, so the audit can own up to it
+     */
+    private function isCrawlable(string $url, ?string $siteHost, array $excludePatterns, array &$disallowed): bool
     {
         $host = self::hostOf($url);
 
@@ -170,8 +179,22 @@ final class SiteCrawler
             return false;
         }
 
-        return !UrlPattern::matchesAny($url, $excludePatterns)
-            && $this->robotsTxtChecker?->isAllowed($url) !== false;
+        if (UrlPattern::matchesAny($url, $excludePatterns)) {
+            return false;
+        }
+
+        if ($this->isDisallowed($url)) {
+            $disallowed[UrlResolver::dedupKey($url)] = $url;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function isDisallowed(string $url): bool
+    {
+        return $this->robotsTxtChecker?->isAllowed($url) === false;
     }
 
     private static function hostOf(string $url): ?string

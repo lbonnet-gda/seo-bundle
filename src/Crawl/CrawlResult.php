@@ -23,6 +23,7 @@ final class CrawlResult
      * @param array<string, PageResponse> $responses dedup key => every internal URL requested, read or not
      * @param array<string, RedirectChain> $redirectChains dedup key of the chain's start URL => chain
      * @param array<string, string> $unreachable dedup key => internal URL that could not be requested at all
+     * @param array<string, string> $disallowed dedup key => internal URL robots.txt disallows for our user agent
      * @param int $urlsChecked how many URLs the crawl requested, redirect hops included
      */
     public function __construct(
@@ -32,6 +33,7 @@ final class CrawlResult
         private readonly array $responses = [],
         private readonly array $redirectChains = [],
         private readonly array $unreachable = [],
+        private readonly array $disallowed = [],
         public readonly int $urlsChecked = 0,
         public readonly bool $truncated = false,
         public readonly bool $blockedByRobotsTxt = false,
@@ -62,6 +64,14 @@ final class CrawlResult
     public function responseFor(string $url): ?PageResponse
     {
         return $this->responses[UrlResolver::dedupKey($url)] ?? null;
+    }
+
+    /**
+     * @return list<string> the internal URLs robots.txt kept the crawl from reading, so they went unaudited
+     */
+    public function disallowedUrls(): array
+    {
+        return array_values($this->disallowed);
     }
 
     public function isUnreachable(string $url): bool

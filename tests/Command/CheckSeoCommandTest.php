@@ -135,6 +135,17 @@ final class CheckSeoCommandTest extends TestCase
         $this->assertStringContainsString('could not be reached', $tester->getDisplay());
     }
 
+    public function testItWarnsAboutTheUrlsRobotsTxtKeepsOut(): void
+    {
+        $tester = $this->tester(new SeoReport('https://example.com', pagesRead: 1, urlsDisallowedByRobotsTxt: 12));
+
+        $this->assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('12 internal URL(s) were left out', $display);
+        $this->assertStringContainsString('respect_robots_txt', $display);
+    }
+
     public function testItWarnsAboutAnIncompleteCrawl(): void
     {
         $tester = $this->tester(

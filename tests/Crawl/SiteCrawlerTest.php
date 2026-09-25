@@ -219,6 +219,7 @@ final class SiteCrawlerTest extends TestCase
         $this->assertSame(['https://example.com/', 'https://example.com/public'], self::urls($crawl));
         $this->assertNotContains('https://example.com/admin', $this->requestedUrls);
         $this->assertNotContains('https://example.com/private', $this->requestedUrls);
+        $this->assertSame(['https://example.com/private'], $crawl->disallowedUrls());
     }
 
     public function testStopsAfterTheStartPageWhenRobotsTxtAnswersAServerError(): void
