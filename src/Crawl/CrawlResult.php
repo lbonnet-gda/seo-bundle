@@ -51,6 +51,14 @@ final class CrawlResult
         $this->linksByTarget = $linksByTarget;
     }
 
+    /**
+     * @return array<string, PageResponse> dedup key => response
+     */
+    public function responses(): array
+    {
+        return $this->responses;
+    }
+
     public function responseFor(string $url): ?PageResponse
     {
         return $this->responses[UrlResolver::dedupKey($url)] ?? null;

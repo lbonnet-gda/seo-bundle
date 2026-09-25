@@ -8,6 +8,11 @@ use Lbonnet\SeoBundle\Http\PageFetcher;
 use Lbonnet\SeoBundle\Http\RedirectChainResolver;
 use Lbonnet\SeoBundle\Http\RedirectChainResolverInterface;
 use Lbonnet\SeoBundle\MessageHandler\CheckSeoMessageHandler;
+use Lbonnet\SeoBundle\Module\Technical\Http\HttpTargetProbe;
+use Lbonnet\SeoBundle\Module\Technical\Http\SitemapFetcher;
+use Lbonnet\SeoBundle\Module\Technical\SiteAuditor;
+use Lbonnet\SeoBundle\Module\Technical\SitemapAuditor;
+use Lbonnet\SeoBundle\Module\Technical\UrlVariantAuditor;
 use Lbonnet\SeoBundle\Robots\RobotsTxtChecker;
 use Lbonnet\SeoBundle\Robots\RobotsTxtCheckerInterface;
 use Lbonnet\SeoBundle\Robots\RobotsTxtProviderInterface;
@@ -36,6 +41,9 @@ return static function (ContainerConfigurator $container): void {
             '../src/Crawl/CrawledPage.php',
             '../src/Crawl/CrawlResult.php',
             '../src/Module/ModuleOptions.php',
+            '../src/Module/Technical/Model/',
+            '../src/Module/Technical/Sitemap/',
+            '../src/Module/Technical/Hreflang/',
         ]);
 
     $services->set(PageFetcher::class)
@@ -53,6 +61,27 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$defaultMaxPages', param('seo.crawl.max_pages'))
         ->arg('$defaultExcludePatterns', param('seo.crawl.exclude_patterns'))
         ->arg('$defaultCheckExternal', param('seo.links.check_external'))
+        ->arg('$disabledChecks', param('seo.disabled_checks'));
+
+    $services->set(HttpTargetProbe::class)
+        ->arg('$enabled', param('seo.technical.resolve_external_targets'))
+        ->arg('$maxProbes', param('seo.technical.max_external_target_checks'));
+
+    $services->set(SitemapFetcher::class)
+        ->arg('$httpClient', service('seo.http_client'))
+        ->arg('$timeout', param('seo.crawl.timeout'))
+        ->arg('$userAgent', param('seo.crawl.user_agent'));
+
+    $services->set(SiteAuditor::class)
+        ->arg('$maxRedirectHops', param('seo.technical.max_redirect_hops'))
+        ->arg('$disabledChecks', param('seo.disabled_checks'));
+
+    $services->set(UrlVariantAuditor::class)
+        ->arg('$sampleSize', param('seo.technical.url_variants_sample_size'))
+        ->arg('$disabledChecks', param('seo.disabled_checks'));
+
+    $services->set(SitemapAuditor::class)
+        ->arg('$maxFiles', param('seo.technical.max_sitemap_files'))
         ->arg('$disabledChecks', param('seo.disabled_checks'));
 
     $services->set(RobotsTxtChecker::class)

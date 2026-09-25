@@ -11,6 +11,7 @@ use Lbonnet\SeoBundle\Crawl\SiteCrawler;
 use Lbonnet\SeoBundle\EventListener\StoreReportListener;
 use Lbonnet\SeoBundle\Http\ThrottledHttpClient;
 use Lbonnet\SeoBundle\MessageHandler\CheckSeoMessageHandler;
+use Lbonnet\SeoBundle\Module\Technical\TechnicalModule;
 use Lbonnet\SeoBundle\Robots\RobotsTxtChecker;
 use Lbonnet\SeoBundle\Robots\RobotsTxtCheckerInterface;
 use Lbonnet\SeoBundle\Robots\RobotsTxtProviderInterface;
@@ -19,6 +20,7 @@ use Lbonnet\SeoBundle\Storage\JsonFileReportStorage;
 use Lbonnet\SeoBundle\Storage\ReportStorageInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+use Symfony\Component\DependencyInjection\Argument\IteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
@@ -157,10 +159,24 @@ final class SeoBundleTest extends TestCase
 
         $auditor = $container->findDefinition(SeoAuditorInterface::class);
         $this->assertSame(SeoAuditor::class, $auditor->getClass());
+        $this->assertSame([TechnicalModule::class], self::moduleClasses($container, $auditor));
 
         $httpClient = $auditor->getArgument(1);
         $httpClient = $httpClient instanceof Definition ? $httpClient : $container->findDefinition((string)$httpClient);
         $this->assertSame(ThrottledHttpClient::class, $httpClient->getClass());
+    }
+
+    public function testADisabledModuleIsNotRegistered(): void
+    {
+        $container = $this->load(['seo' => ['technical' => false]]);
+        $container->register(HttpClientInterface::class)->setSynthetic(true)->setPublic(true);
+        $container->getAlias(SeoAuditorInterface::class)->setPublic(true);
+
+        $this->assertFalse($container->hasDefinition(TechnicalModule::class));
+
+        $container->compile();
+
+        $this->assertSame([], self::moduleClasses($container, $container->findDefinition(SeoAuditorInterface::class)));
     }
 
     public function testAnUnknownDisabledCheckIsRejected(): void
@@ -183,6 +199,22 @@ final class SeoBundleTest extends TestCase
 
         $this->assertFalse($container->hasDefinition(JsonFileReportStorage::class));
         $this->assertFalse($container->hasAlias(ReportStorageInterface::class));
+    }
+
+    /**
+     * @return list<string|null> the classes of the modules handed to the auditor
+     */
+    private static function moduleClasses(ContainerBuilder $container, Definition $auditor): array
+    {
+        $modules = $auditor->getArgument(2);
+        self::assertInstanceOf(IteratorArgument::class, $modules);
+
+        return array_map(
+            static fn(mixed $module): ?string => $module instanceof Definition
+                ? $module->getClass()
+                : $container->findDefinition((string)$module)->getClass(),
+            $modules->getValues(),
+        );
     }
 
     /**

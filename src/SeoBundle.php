@@ -8,6 +8,7 @@ use Lbonnet\SeoBundle\Http\ThrottledHttpClient;
 use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\Severity;
 use Lbonnet\SeoBundle\Module\ModuleInterface;
+use Lbonnet\SeoBundle\Module\Technical\TechnicalModule;
 use Lbonnet\SeoBundle\Storage\JsonFileReportStorage;
 use Lbonnet\SeoBundle\Storage\ReportStorageInterface;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
@@ -116,6 +117,10 @@ final class SeoBundle extends AbstractBundle
 
         $builder->register('seo.http_client', ThrottledHttpClient::class)
             ->setArguments([new Reference($privateNetworkGuardId), $config['crawl']['request_delay_ms']]);
+
+        if (!$config['technical']['enabled']) {
+            $builder->removeDefinition(TechnicalModule::class);
+        }
 
         if ($config['storage']['dir'] === null || $config['storage']['dir'] === '') {
             $builder->removeDefinition(JsonFileReportStorage::class);
