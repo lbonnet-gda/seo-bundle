@@ -86,7 +86,10 @@ final class SeoAuditor implements SeoAuditorInterface
             checkLinkTargets: self::includes($selectedModules, Module::Links),
             progressCallback: $progressCallback !== null ? $progressCallback(...) : null,
         );
-        $moduleOptions = new ModuleOptions(checkExternal: $checkExternal ?? $this->defaultCheckExternal);
+        $moduleOptions = new ModuleOptions(
+            checkExternal: $checkExternal ?? $this->defaultCheckExternal,
+            modules: array_map(static fn(ModuleInterface $module): Module => $module->module(), $selectedModules),
+        );
 
         if ($this->robotsTxtChecker instanceof ResetInterface) {
             $this->robotsTxtChecker->reset();

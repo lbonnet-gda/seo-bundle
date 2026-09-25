@@ -18,5 +18,5 @@ interface SiteAuditorInterface
      *
      * @return list<PageAudit>
      */
-    public function audit(array $pages, CrawlContext $context): array;
+    public function audit(array $pages, CrawlContext $context, bool $reportDeadRedirects = true): array;
 }

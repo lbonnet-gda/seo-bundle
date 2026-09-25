@@ -102,6 +102,27 @@ final class SiteAuditorTest extends TestCase
         $this->assertSame([], $audited[0]->issues);
     }
 
+    public function testLeavesDeadRedirectsToTheLinksModuleWhenItRuns(): void
+    {
+        $chain = new RedirectChain(
+            'https://example.com/old',
+            Response::HTTP_MOVED_PERMANENTLY,
+            [new RedirectHop('https://example.com/old', Response::HTTP_MOVED_PERMANENTLY, 'https://example.com/gone')],
+            'https://example.com/gone',
+            Response::HTTP_NOT_FOUND,
+        );
+        $context = new CrawlContext(
+            redirectChains: ['https://example.com/old' => $chain],
+            referrers: ['https://example.com/old' => ['https://example.com/']],
+        );
+
+        $audited = $this->auditor()->audit([$this->page('https://example.com/')], $context, false);
+
+        $this->assertSame([], self::types($audited[0]->issues));
+        $this->assertSame('https://example.com/old', $audited[1]->url);
+        $this->assertSame([IssueType::RedirectToError], self::types($audited[1]->issues));
+    }
+
     public function testFlagsEveryPageLinkingToARedirect(): void
     {
         $pages = [

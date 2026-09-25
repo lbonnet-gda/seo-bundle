@@ -44,7 +44,7 @@ final class SiteAuditor implements SiteAuditorInterface
         $this->disabledChecks = $disabled;
     }
 
-    public function audit(array $pages, CrawlContext $context): array
+    public function audit(array $pages, CrawlContext $context, bool $reportDeadRedirects = true): array
     {
         $this->probe->reset();
 
@@ -91,7 +91,11 @@ final class SiteAuditor implements SiteAuditorInterface
 
             foreach ($context->referrersOf($chain->startUrl) as $referrerUrl) {
                 $key = UrlResolver::dedupKey($referrerUrl);
-                $extraIssues[$key] = [...($extraIssues[$key] ?? []), $this->linkToRedirectIssue($chain)];
+                $issue = $this->linkToRedirectIssue($chain, $reportDeadRedirects);
+
+                if ($issue !== null) {
+                    $extraIssues[$key] = [...($extraIssues[$key] ?? []), $issue];
+                }
             }
         }
 
@@ -546,9 +550,13 @@ final class SiteAuditor implements SiteAuditorInterface
         return $issues;
     }
 
-    private function linkToRedirectIssue(RedirectChain $chain): Issue
+    private function linkToRedirectIssue(RedirectChain $chain, bool $reportDeadRedirects): ?Issue
     {
         if (!$chain->endsSuccessfully()) {
+            if (!$reportDeadRedirects) {
+                return null;
+            }
+
             return new Issue(
                 IssueType::InternalLinkToRedirect,
                 sprintf(

@@ -46,7 +46,11 @@ final class TechnicalModule implements ModuleInterface
                 issues: $audit->issues,
                 depth: $audit->signals !== null ? $audit->depth : null,
             ),
-            $this->siteAuditor->audit($pages, CrawlContext::fromCrawl($crawl)),
+            $this->siteAuditor->audit(
+                $pages,
+                CrawlContext::fromCrawl($crawl),
+                reportDeadRedirects: !$options->runs(Module::Links),
+            ),
         );
     }
 }

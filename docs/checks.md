@@ -78,7 +78,9 @@ and whatever `respect_robots_txt` says. A problem with the file itself is report
 | `meta_refresh_redirect`     | warning  | `<meta http-equiv="refresh">` used instead of a 301                                |
 
 An issue about a redirect itself is reported **once**, on the redirecting URL, however many pages link to it. Each
-linking page gets its own `internal_link_to_redirect` instead.
+linking page gets its own `internal_link_to_redirect` instead. When the links module runs, a redirect that never reaches
+a working page is its finding — `broken_internal_link`, carrying the status the chain ends on — so the linking pages are
+told once, not by both modules.
 
 ### URL variants
 

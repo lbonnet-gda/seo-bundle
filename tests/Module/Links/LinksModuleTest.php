@@ -13,6 +13,10 @@ use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\SeoReport;
 use Lbonnet\SeoBundle\Module\Links\LinksModule;
 use Lbonnet\SeoBundle\Module\Links\UrlChecker;
+use Lbonnet\SeoBundle\Module\Technical\Http\TargetProbeInterface;
+use Lbonnet\SeoBundle\Module\Technical\PageAuditor;
+use Lbonnet\SeoBundle\Module\Technical\SiteAuditor;
+use Lbonnet\SeoBundle\Module\Technical\TechnicalModule;
 use Lbonnet\SeoBundle\Robots\RobotsTxtCheckerInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -72,6 +76,38 @@ final class LinksModuleTest extends TestCase
             ],
             $messages,
         );
+    }
+
+    public function testADeadRedirectIsReportedOnceEvenWithTheTechnicalModuleOn(): void
+    {
+        $httpClient = new MockHttpClient(function (string $method, string $url): MockResponse {
+            $this->requestedUrls[] = $url;
+            $site = [
+                'https://example.com/' => self::page('<a href="/dead-end">Dead end</a>'),
+                'https://example.com/dead-end' => self::redirect('https://example.com/gone'),
+            ];
+            [$body, $info] = $site[$url] ?? ['', ['http_code' => Response::HTTP_NOT_FOUND]];
+
+            return new MockResponse($body, $info);
+        });
+        $pageFetcher = new PageFetcher($httpClient);
+
+        $report = (new SeoAuditor(
+            crawler: new SiteCrawler($pageFetcher, new RedirectChainResolver($pageFetcher)),
+            httpClient: $httpClient,
+            modules: [
+                new LinksModule(new UrlChecker($httpClient)),
+                new TechnicalModule(
+                    new PageAuditor(),
+                    new SiteAuditor($this->createMock(TargetProbeInterface::class)),
+                ),
+            ],
+        ))->audit('https://example.com/');
+
+        $types = array_map(static fn(Issue $issue): IssueType => $issue->type, $report->pages[0]->issues);
+
+        $this->assertContains(IssueType::BrokenInternalLink, $types);
+        $this->assertNotContains(IssueType::InternalLinkToRedirect, $types);
     }
 
     public function testAnInternalLinkThatCannotBeReachedIsBroken(): void
