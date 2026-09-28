@@ -71,6 +71,29 @@ final class JsonFileReportStorageTest extends TestCase
         $this->assertStringContainsString('"context": {}', $json);
     }
 
+    public function testInvalidUtf8InAPageDoesNotCostTheWholeReport(): void
+    {
+        $report = new SeoReport(
+            startUrl: 'https://example.com/',
+            pages: [
+                new PageReport(
+                    url: "https://example.com/caf\xE9",
+                    statusCode: Response::HTTP_OK,
+                    issues: [new Issue(IssueType::MissingTitle, "The page \xE9 has no <title>.")],
+                ),
+            ],
+        );
+
+        $path = (new JsonFileReportStorage($this->directory))->save($report);
+
+        $decoded = json_decode((string)file_get_contents($path), true);
+
+        $this->assertIsArray($decoded);
+        // The bad byte becomes U+FFFD instead of silently truncating the file to nothing.
+        $this->assertStringContainsString("\u{FFFD}", $decoded['pages'][0]['issues'][0]['message']);
+        $this->assertSame('missing_title', $decoded['pages'][0]['issues'][0]['type']);
+    }
+
     public function testRotationKeepsOnlyTheMostRecentReports(): void
     {
         $storage = new JsonFileReportStorage($this->directory, maxReports: 2);

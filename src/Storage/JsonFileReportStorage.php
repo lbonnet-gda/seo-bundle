@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lbonnet\SeoBundle\Storage;
 
 use DateTimeInterface;
+use JsonException;
 use Lbonnet\SeoBundle\Model\Issue;
 use Lbonnet\SeoBundle\Model\Module;
 use Lbonnet\SeoBundle\Model\PageReport;
@@ -70,7 +71,19 @@ final class JsonFileReportStorage implements ReportStorageInterface
             ], $report->pages),
         ];
 
-        $written = file_put_contents($filePath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        try {
+            $json = json_encode(
+                $data,
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR,
+            );
+        } catch (JsonException $e) {
+            throw new RuntimeException(
+                sprintf('Could not encode the report for "%s": %s', $report->startUrl, $e->getMessage()),
+                previous: $e,
+            );
+        }
+
+        $written = file_put_contents($filePath, $json);
 
         if ($written === false) {
             throw new RuntimeException(sprintf('Could not write report file "%s".', $filePath));
