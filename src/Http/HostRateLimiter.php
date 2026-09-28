@@ -24,14 +24,14 @@ final class HostRateLimiter implements ResetInterface
     /**
      * @param int $defaultDelayMs minimum delay between two requests to the same host
      * @param int $defaultMaxInFlight how many requests may be in flight per host
-     * @param (Closure(): float)|null $clock seconds, as microtime(true) returns them
+     * @param (Closure(): float)|null $clock seconds elapsed, from any origin, as long as it never goes backwards
      */
     public function __construct(
         private readonly int $defaultDelayMs = 0,
         private readonly int $defaultMaxInFlight = 1,
         ?Closure $clock = null,
     ) {
-        $this->clock = $clock ?? static fn(): float => microtime(true);
+        $this->clock = $clock ?? static fn(): float => hrtime(true) / 1e9;
     }
 
     public function setHostLimits(string $host, int $delayMs, int $maxInFlight = 1): void
