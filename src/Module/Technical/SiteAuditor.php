@@ -66,7 +66,7 @@ final class SiteAuditor implements SiteAuditorInterface
             $key = UrlResolver::dedupKey($page->url);
             $pagesByKey[$key] = $page;
             $hreflangUrlsByKey[$key] = $page->hreflangUrls();
-            $crawledHosts[self::hostOf($page->url)] = true;
+            $crawledHosts[(string)UrlResolver::hostOf($page->url)] = true;
         }
 
         /** @var array<string, list<Issue>> $extraIssues dedup key of a page URL => issues to add */
@@ -436,7 +436,7 @@ final class SiteAuditor implements SiteAuditorInterface
         $urlByHost = [];
 
         foreach ($pages as $page) {
-            $host = parse_url($page->url, PHP_URL_HOST);
+            $host = UrlResolver::hostOf($page->url);
 
             if (is_string($host)) {
                 $urlByHost[strtolower($host)] ??= $page->url;
@@ -497,7 +497,7 @@ final class SiteAuditor implements SiteAuditorInterface
             return false;
         }
 
-        $robotsTxt = isset($crawledHosts[self::hostOf($url)])
+        $robotsTxt = isset($crawledHosts[(string)UrlResolver::hostOf($url)])
             ? $this->robotsTxtProvider->robotsTxt($url)
             : $this->probe->robotsTxt($url);
 
@@ -509,11 +509,6 @@ final class SiteAuditor implements SiteAuditorInterface
         $response = $context->responseFor($url);
 
         return $response !== null && UrlResolver::isSameUrl($response->url, $url) ? $response : null;
-    }
-
-    private static function hostOf(string $url): string
-    {
-        return strtolower((string)parse_url($url, PHP_URL_HOST));
     }
 
     /**

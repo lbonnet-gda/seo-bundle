@@ -64,7 +64,7 @@ final class LinksModule implements ModuleInterface
             foreach ($crawl->externalLinks() as $url => $entries) {
                 $result = $this->urlChecker->check($url);
 
-                if ($result->isReachable()) {
+                if (!$result->isBroken()) {
                     continue;
                 }
 
@@ -120,10 +120,10 @@ final class LinksModule implements ModuleInterface
         }
 
         if ($chain->finalStatusCode === null) {
-            return sprintf('redirects to "%s", which could not be reached', (string)$chain->finalUrl);
+            return sprintf('redirects to "%s", which could not be reached', $chain->finalUrl);
         }
 
-        return sprintf('redirects to "%s", which answers %d', (string)$chain->finalUrl, $chain->finalStatusCode);
+        return sprintf('redirects to "%s", which answers %d', $chain->finalUrl, $chain->finalStatusCode);
     }
 
     private static function externalLinkIssue(string $url, CheckResult $result, PageLink $link): Issue
@@ -144,7 +144,7 @@ final class LinksModule implements ModuleInterface
 
         $problem = $result->statusCode !== null
             ? sprintf('answers %d', $result->statusCode)
-            : sprintf('could not be reached (%s)', (string)$result->errorMessage);
+            : sprintf('could not be reached (%s)', $result->errorMessage);
 
         return self::brokenLink(IssueType::BrokenExternalLink, $url, $problem, $link, $result->statusCode);
     }

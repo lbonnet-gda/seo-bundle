@@ -53,7 +53,6 @@ final class UrlChecker implements UrlCheckerInterface
     public function check(string $url, ?int $timeout = null): CheckResult
     {
         $requestTimeout = $timeout ?? $this->defaultTimeout;
-        $startTime = microtime(true);
 
         try {
             $response = $this->httpClient->request(Request::METHOD_HEAD, $url, [
@@ -78,38 +77,20 @@ final class UrlChecker implements UrlCheckerInterface
                 $statusCode = $response->getStatusCode();
             }
 
-            $duration = microtime(true) - $startTime;
             /** @var array<string, list<string>> $headers */
             $headers = $response->getHeaders(false);
-            $contentType = $headers['content-type'][0] ?? null;
-            $redirectUrl = $response->getInfo('redirect_url');
             $blockedBy = $this->detectBotProtection($statusCode, $headers);
 
             return new CheckResult(
                 url: $url,
                 statusCode: $statusCode,
-                duration: round($duration, 3),
-                redirectUrl: $redirectUrl ?: null,
-                contentType: $contentType,
                 likelyBlocked: $blockedBy !== null,
                 blockedBy: $blockedBy,
             );
         } catch (TransportExceptionInterface $e) {
-            $duration = microtime(true) - $startTime;
-
-            return new CheckResult(
-                url: $url,
-                duration: round($duration, 3),
-                errorMessage: $e->getMessage()
-            );
+            return new CheckResult(url: $url, errorMessage: $e->getMessage());
         } catch (Throwable $e) {
-            $duration = microtime(true) - $startTime;
-
-            return new CheckResult(
-                url: $url,
-                duration: round($duration, 3),
-                errorMessage: 'Unexpected error: '.$e->getMessage()
-            );
+            return new CheckResult(url: $url, errorMessage: 'Unexpected error: '.$e->getMessage());
         }
     }
 

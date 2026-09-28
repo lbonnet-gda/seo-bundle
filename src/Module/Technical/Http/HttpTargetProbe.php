@@ -12,7 +12,7 @@ use Lbonnet\SeoBundle\Url\UrlResolver;
 
 final class HttpTargetProbe implements TargetProbeInterface
 {
-    /** The status of a URL that was requested and never answered: DNS, timeout or TLS failure. */
+    /** The status of a URL that was requested and never answered: DNS, timeout, or TLS failure. */
     public const NO_ANSWER = 0;
 
     /** @var array<string, PageResponse|null> dedup key => response (null = probed and failed) */
@@ -59,7 +59,7 @@ final class HttpTargetProbe implements TargetProbeInterface
             return null;
         }
 
-        $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+        $host = (string)UrlResolver::hostOf($url);
 
         if (array_key_exists($host, $this->robotsTxtCache)) {
             return $this->robotsTxtCache[$host];

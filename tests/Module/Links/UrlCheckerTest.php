@@ -25,10 +25,8 @@ final class UrlCheckerTest extends TestCase
 
         $result = $checker->check('https://example.com');
 
-        $this->assertTrue($result->isReachable());
         $this->assertFalse($result->isBroken());
         $this->assertSame(Response::HTTP_OK, $result->statusCode);
-        $this->assertSame('text/html; charset=UTF-8', $result->contentType);
         $this->assertNull($result->errorMessage);
     }
 
@@ -43,7 +41,7 @@ final class UrlCheckerTest extends TestCase
 
         $result = $checker->check('https://example.com/api');
 
-        $this->assertTrue($result->isReachable());
+        $this->assertFalse($result->isBroken());
         $this->assertSame(Response::HTTP_OK, $result->statusCode);
     }
 
@@ -58,7 +56,7 @@ final class UrlCheckerTest extends TestCase
 
         $result = $checker->check('https://example.com/head-not-supported');
 
-        $this->assertTrue($result->isReachable());
+        $this->assertFalse($result->isBroken());
         $this->assertSame(Response::HTTP_OK, $result->statusCode);
     }
 
@@ -126,7 +124,6 @@ final class UrlCheckerTest extends TestCase
 
         $result = $checker->check('https://timeout.com');
 
-        $this->assertFalse($result->isReachable());
         $this->assertTrue($result->isBroken());
         $this->assertNull($result->statusCode);
         $this->assertStringContainsString('Connection timeout', (string)$result->errorMessage);

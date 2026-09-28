@@ -65,7 +65,7 @@ final class SitemapAuditor implements SitemapAuditorInterface
     public function audit(array $pages, CrawlContext $context): array
     {
         $this->entries = [];
-        $startPage = self::startPage($pages);
+        $startPage = PageAudit::startPageOf($pages);
         $parts = $startPage !== null ? parse_url($startPage->url) : null;
 
         if (!is_array($parts) || !isset($parts['scheme'], $parts['host']) || $this->disabledChecks->hasAll(
@@ -350,7 +350,7 @@ final class SitemapAuditor implements SitemapAuditorInterface
         foreach ($pages as $page) {
             if (
                 isset($listedUrls[self::key($page->url)])
-                || strtolower((string)parse_url($page->url, PHP_URL_HOST)) !== $host
+                || UrlResolver::hostOf($page->url) !== $host
                 || $page->canonicalElsewhere() !== null
                 || $page->signals?->metaRobotsDirectives()->hasNoindex() === true
                 || self::crawledResponse($page->url, $context)?->headerRobotsDirectives()->hasNoindex() === true
@@ -382,7 +382,7 @@ final class SitemapAuditor implements SitemapAuditorInterface
             return sprintf('The sitemap lists "%s", which is not an absolute URL.', $location);
         }
 
-        if (strtolower((string)parse_url($location, PHP_URL_HOST)) !== $host) {
+        if (UrlResolver::hostOf($location) !== $host) {
             return sprintf(
                 'The sitemap lists "%s", which is on another host than "%s": search engines ignore it.',
                 $location,
@@ -399,12 +399,12 @@ final class SitemapAuditor implements SitemapAuditorInterface
             return sprintf('The sitemap index lists "%s", which is not an absolute URL.', $location);
         }
 
-        $indexHost = strtolower((string)parse_url($indexUrl, PHP_URL_HOST));
+        $indexHost = UrlResolver::hostOf($indexUrl);
         $indexPath = (string)parse_url($indexUrl, PHP_URL_PATH);
         $indexDirectory = substr($indexPath, 0, (int)strrpos($indexPath, '/') + 1);
 
         if (
-            strtolower((string)parse_url($location, PHP_URL_HOST)) !== $indexHost
+            UrlResolver::hostOf($location) !== $indexHost
             || !str_starts_with((string)parse_url($location, PHP_URL_PATH), $indexDirectory)
         ) {
             return sprintf(
@@ -434,21 +434,4 @@ final class SitemapAuditor implements SitemapAuditorInterface
     {
         return UrlResolver::exactKey($url);
     }
-
-    /**
-     * @param list<PageAudit> $pages
-     */
-    private static function startPage(array $pages): ?PageAudit
-    {
-        $startPage = null;
-
-        foreach ($pages as $page) {
-            if ($startPage === null || $page->depth < $startPage->depth) {
-                $startPage = $page;
-            }
-        }
-
-        return $startPage;
-    }
-
 }

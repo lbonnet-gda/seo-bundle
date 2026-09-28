@@ -6,7 +6,6 @@ namespace Lbonnet\SeoBundle\Module\Technical\Model;
 
 use Lbonnet\SeoBundle\Model\Issue;
 use Lbonnet\SeoBundle\Model\PageSignals;
-use Lbonnet\SeoBundle\Model\Severity;
 
 final class PageAudit
 {
@@ -43,26 +42,20 @@ final class PageAudit
         return $this->withIssues([...$this->issues, ...$issues]);
     }
 
-    public function hasIssues(?Severity $atLeast = null): bool
+    /**
+     * @param list<self> $pages
+     */
+    public static function startPageOf(array $pages): ?self
     {
-        return $this->countIssues($atLeast) > 0;
-    }
+        $startPage = null;
 
-    public function countIssues(?Severity $atLeast = null): int
-    {
-        if ($atLeast === null) {
-            return count($this->issues);
-        }
-
-        $count = 0;
-
-        foreach ($this->issues as $issue) {
-            if ($issue->severity()->isAtLeast($atLeast)) {
-                $count++;
+        foreach ($pages as $page) {
+            if ($startPage === null || $page->depth < $startPage->depth) {
+                $startPage = $page;
             }
         }
 
-        return $count;
+        return $startPage;
     }
 
     public function canonicalElsewhere(): ?string

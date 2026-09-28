@@ -49,7 +49,7 @@ final class SiteCrawler
         $queue = [['url' => $startUrl, 'depth' => 0, 'read' => true, 'force' => false]];
 
         $startKey = UrlResolver::dedupKey($startUrl);
-        $siteHost = self::hostOf($startUrl);
+        $siteHost = UrlResolver::hostOf($startUrl);
         $siteUrl = $startUrl;
 
         while ($queue !== []) {
@@ -89,7 +89,7 @@ final class SiteCrawler
                 $finalUrl = $chain->finalUrl;
 
                 if ($key === $startKey && $finalUrl !== null && $chain->endsSuccessfully()) {
-                    $finalHost = self::hostOf($finalUrl);
+                    $finalHost = UrlResolver::hostOf($finalUrl);
 
                     if ($finalHost !== null && strcasecmp($finalHost, (string)$siteHost) !== 0) {
                         $siteHost = $finalHost;
@@ -173,7 +173,7 @@ final class SiteCrawler
      */
     private function isCrawlable(string $url, ?string $siteHost, array $excludePatterns, array &$disallowed): bool
     {
-        $host = self::hostOf($url);
+        $host = UrlResolver::hostOf($url);
 
         if ($siteHost === null || $host === null || strcasecmp($host, $siteHost) !== 0) {
             return false;
@@ -195,12 +195,5 @@ final class SiteCrawler
     private function isDisallowed(string $url): bool
     {
         return $this->robotsTxtChecker?->isAllowed($url) === false;
-    }
-
-    private static function hostOf(string $url): ?string
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-
-        return is_string($host) ? $host : null;
     }
 }

@@ -45,6 +45,13 @@ final class UrlResolver
         return sprintf('%s://%s%s', $scheme, $authority, self::normalizePath(((string)$directory).$reference));
     }
 
+    public static function hostOf(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? strtolower($host) : null;
+    }
+
     public static function isAbsoluteHttpUrl(string $url): bool
     {
         return preg_match('#^https?://[^/?\#]+#i', $url) === 1;

@@ -36,7 +36,7 @@ final class UrlVariantAuditor implements UrlVariantAuditorInterface
 
     public function audit(array $pages, CrawlContext $context): array
     {
-        $startPage = self::startPage($pages);
+        $startPage = PageAudit::startPageOf($pages);
         $parts = $startPage !== null ? parse_url($startPage->url) : null;
 
         if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
@@ -229,22 +229,6 @@ final class UrlVariantAuditor implements UrlVariantAuditorInterface
             && !isset($parts['query'])
             && ($parts['path'] ?? '/') !== '/'
             && $page->canonicalElsewhere() === null;
-    }
-
-    /**
-     * @param list<PageAudit> $pages
-     */
-    private static function startPage(array $pages): ?PageAudit
-    {
-        $startPage = null;
-
-        foreach ($pages as $page) {
-            if ($startPage === null || $page->depth < $startPage->depth) {
-                $startPage = $page;
-            }
-        }
-
-        return $startPage;
     }
 
     /**
