@@ -161,6 +161,22 @@ final class LinksModuleTest extends TestCase
         $this->assertCount(2, array_keys($this->requestedUrls, 'https://other.com/gone', true));
     }
 
+    public function testTheHttpAndHttpsVersionsOfAnExternalLinkAreCheckedSeparately(): void
+    {
+        $report = $this->audit([
+            'https://example.com/' => self::page(
+                '<a href="http://other.com/x">Insecure</a><a href="https://other.com/x">Secure</a>'
+            ),
+            'https://other.com/x' => self::page(),
+        ]);
+
+        $this->assertSame(
+            ['https://example.com/' => [IssueType::BrokenExternalLink]],
+            self::typesByUrl($report),
+        );
+        $this->assertStringContainsString('"http://other.com/x"', $report->pages[0]->issues[0]->message);
+    }
+
     public function testAnExternalLinkBehindBotProtectionIsOnlyANotice(): void
     {
         $report = $this->audit([

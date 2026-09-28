@@ -33,6 +33,8 @@ final class SiteCrawler
     ): CrawlResult {
         /** @var array<string, true> $visited */
         $visited = [];
+        /** @var array<string, true> $bodySkipped */
+        $bodySkipped = [];
         $responses = [];
         /** @var array<string, RedirectChain> $chains */
         $chains = [];
@@ -56,7 +58,7 @@ final class SiteCrawler
             ['url' => $url, 'depth' => $depth, 'read' => $read, 'force' => $force] = array_shift($queue);
             $key = UrlResolver::dedupKey($url);
 
-            if (isset($visited[$key]) && !$force) {
+            if (isset($visited[$key]) && !$force && !($read && isset($bodySkipped[$key]))) {
                 continue;
             }
 
@@ -75,9 +77,16 @@ final class SiteCrawler
             $urlsChecked++;
 
             if ($response === null) {
+                unset($bodySkipped[$key]);
                 $unreachable[$key] = $url;
 
                 continue;
+            }
+
+            if ($read) {
+                unset($bodySkipped[$key]);
+            } else {
+                $bodySkipped[$key] = true;
             }
 
             $responses[$key] = $response;
@@ -136,12 +145,17 @@ final class SiteCrawler
             }
 
             foreach ($signals->links as $link) {
-                if ($link->isExternal || isset($visited[UrlResolver::dedupKey($link->url)])) {
+                $linkKey = UrlResolver::dedupKey($link->url);
+
+                $alreadyRequested = isset($visited[$linkKey]);
+                $readableNow = $readLinks && isset($bodySkipped[$linkKey]);
+
+                if ($link->isExternal || ($alreadyRequested && !$readableNow)) {
                     continue;
                 }
 
                 if ($this->isDisallowed($link->url)) {
-                    $disallowed[UrlResolver::dedupKey($link->url)] = $link->url;
+                    $disallowed[$linkKey] = $link->url;
 
                     continue;
                 }
@@ -164,9 +178,6 @@ final class SiteCrawler
         );
     }
 
-    /**
-     * @param list<string> $excludePatterns
-     */
     /**
      * @param list<string> $excludePatterns
      * @param array<string, string> $disallowed collects what robots.txt keeps out, so the audit can own up to it

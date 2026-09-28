@@ -132,6 +132,24 @@ final class SiteCrawlerTest extends TestCase
         $this->assertNotContains('https://example.com/three', $this->requestedUrls);
     }
 
+    public function testReadsAPageFirstRequestedWithoutItsBodyWhenARedirectAlsoLeadsToIt(): void
+    {
+        $site = [
+            'https://example.com/' => self::page('<a href="/b">B</a><a href="/r">R</a>'),
+            'https://example.com/b' => self::page('<a href="/x">X</a>'),
+            'https://example.com/r' => self::redirect('https://example.com/x'),
+            'https://example.com/x' => self::page(),
+        ];
+
+        $crawl = $this->crawl($site, new CrawlOptions(maxDepth: 1, checkLinkTargets: true));
+
+        $this->assertSame(
+            ['https://example.com/', 'https://example.com/b', 'https://example.com/x'],
+            self::urls($crawl),
+        );
+        $this->assertNotNull($crawl->responseFor('https://example.com/x')?->html);
+    }
+
     public function testStopsAtTheMaxPagesLimitAndMarksTheCrawlAsTruncated(): void
     {
         $site = [

@@ -17,6 +17,9 @@ final class CrawlResult
     /** @var array<string, list<array{page: CrawledPage, link: PageLink}>> dedup key of a target => its links */
     private readonly array $linksByTarget;
 
+    /** @var array<string, list<array{page: CrawledPage, link: PageLink}>> exact key of an external target => links */
+    private readonly array $externalLinksByTarget;
+
     /**
      * @param string $siteUrl where the start URL leads, when it redirects to another host (e.g. apex to www)
      * @param list<CrawledPage> $pages the HTML pages read, in crawl order
@@ -40,17 +43,25 @@ final class CrawlResult
     ) {
         $pagesByKey = [];
         $linksByTarget = [];
+        $externalLinksByTarget = [];
 
         foreach ($pages as $page) {
             $pagesByKey[UrlResolver::dedupKey($page->url)] = $page;
 
             foreach ($page->signals->links as $link) {
                 $linksByTarget[UrlResolver::dedupKey($link->url)][] = ['page' => $page, 'link' => $link];
+
+                if ($link->isExternal) {
+                    // Unlike the audited site, whose http:// and https:// versions the crawl folds together, another
+                    // site's two schemes are two endpoints: one can answer where the other does not.
+                    $externalLinksByTarget[UrlResolver::exactKey($link->url)][] = ['page' => $page, 'link' => $link];
+                }
             }
         }
 
         $this->pagesByKey = $pagesByKey;
         $this->linksByTarget = $linksByTarget;
+        $this->externalLinksByTarget = $externalLinksByTarget;
     }
 
     /**
@@ -114,10 +125,8 @@ final class CrawlResult
     {
         $externalLinks = [];
 
-        foreach ($this->linksByTarget as $entries) {
-            if ($entries[0]['link']->isExternal) {
-                $externalLinks[$entries[0]['link']->url] = $entries;
-            }
+        foreach ($this->externalLinksByTarget as $entries) {
+            $externalLinks[$entries[0]['link']->url] = $entries;
         }
 
         return $externalLinks;
