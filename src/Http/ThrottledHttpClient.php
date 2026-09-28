@@ -12,24 +12,37 @@ use Symfony\Contracts\Service\ResetInterface;
 
 final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, ThrottleExemptionInterface
 {
+    private const IDLE_WAIT_US = 1_000;
+
     private HttpClientInterface $client;
-    private int $delayMs;
+    private readonly HostRateLimiter $rateLimiter;
     private ?string $overrideHost = null;
-    private int $overrideDelayMs = 0;
 
-    /** @var array<string, float> host => microtime() of the last request start */
-    private array $lastRequestAt = [];
+    /** @var array<string, true> hosts whose slot this client is still holding */
+    private array $heldSlots = [];
 
-    public function __construct(HttpClientInterface $client, int $delayMs = 0)
+    /**
+     * @param HostRateLimiter|null $rateLimiter share one to keep a concurrent caller and this client in step
+     */
+    public function __construct(HttpClientInterface $client, int $delayMs = 0, ?HostRateLimiter $rateLimiter = null)
     {
         $this->client = $client;
-        $this->delayMs = $delayMs;
+        $this->rateLimiter = $rateLimiter ?? new HostRateLimiter($delayMs);
     }
 
     public function setHostDelay(?string $host, int $delayMs = 0): void
     {
-        $this->overrideHost = $host !== null ? strtolower($host) : null;
-        $this->overrideDelayMs = $delayMs;
+        if ($this->overrideHost !== null) {
+            $this->rateLimiter->clearHostLimits($this->overrideHost);
+            $this->overrideHost = null;
+        }
+
+        if ($host === null) {
+            return;
+        }
+
+        $this->overrideHost = strtolower($host);
+        $this->rateLimiter->setHostLimits($this->overrideHost, $delayMs);
     }
 
     /**
@@ -38,7 +51,11 @@ final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, 
      */
     public function request(string $method, string $url, array $options = []): ResponseInterface
     {
-        $this->throttle($url);
+        $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+
+        if ($host !== '') {
+            $this->awaitSlot($host);
+        }
 
         return $this->client->request($method, $url, $options);
     }
@@ -65,27 +82,21 @@ final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, 
             $this->client->reset();
         }
 
-        $this->lastRequestAt = [];
+        $this->heldSlots = [];
+        $this->rateLimiter->reset();
     }
 
-    private function throttle(string $url): void
+    private function awaitSlot(string $host): void
     {
-        $host = strtolower((string)parse_url($url, PHP_URL_HOST));
-        if ($host === '') {
-            return;
+        if (isset($this->heldSlots[$host])) {
+            unset($this->heldSlots[$host]);
+            $this->rateLimiter->release($host);
         }
 
-        $delayMs = $host === $this->overrideHost ? $this->overrideDelayMs : $this->delayMs;
-
-        if ($delayMs > 0) {
-            $elapsedMs = (microtime(true) - ($this->lastRequestAt[$host] ?? 0.0)) * 1000;
-            $remainingMs = $delayMs - $elapsedMs;
-
-            if ($remainingMs > 0) {
-                usleep((int)round($remainingMs * 1000));
-            }
+        while (!$this->rateLimiter->tryAcquire($host)) {
+            usleep(max(self::IDLE_WAIT_US, (int)round($this->rateLimiter->waitTimeFor($host) * 1_000_000)));
         }
 
-        $this->lastRequestAt[$host] = microtime(true);
+        $this->heldSlots[$host] = true;
     }
 }

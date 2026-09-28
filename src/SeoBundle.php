@@ -182,7 +182,7 @@ final class SeoBundle extends AbstractBundle
             ->defaultValue(200)
             ->min(0)
             ->info(
-                'Minimum delay, in milliseconds, between consecutive requests to the same host. The audited host is exempt (unless its robots.txt sets a Crawl-delay), so this only slows down requests to other hosts. Set to 0 to disable throttling entirely.'
+                'Minimum delay, in milliseconds, left between requests to the same host, counted from the end of one request to the start of the next. The audited host is exempt (unless its robots.txt sets a Crawl-delay), so this only slows down requests to other hosts. Set to 0 to disable throttling entirely.'
             )
             ->end();
 

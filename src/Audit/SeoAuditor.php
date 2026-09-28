@@ -69,7 +69,7 @@ final class SeoAuditor implements SeoAuditorInterface
         ?bool $checkExternal = null,
         ?callable $progressCallback = null,
     ): SeoReport {
-        $startTime = microtime(true);
+        $startTime = hrtime(true);
         $selectedModules = $this->selectModules($modules);
 
         $options = new CrawlOptions(
@@ -108,7 +108,7 @@ final class SeoAuditor implements SeoAuditorInterface
             modules: array_map(static fn(ModuleInterface $module): Module => $module->module(), $selectedModules),
             pagesRead: count($crawl->pages),
             urlsChecked: $crawl->urlsChecked,
-            totalDuration: round(microtime(true) - $startTime, 3),
+            totalDuration: round((hrtime(true) - $startTime) / 1e9, 3),
             truncated: $crawl->truncated,
             blockedByRobotsTxt: $crawl->blockedByRobotsTxt,
             startUrlStatusCode: self::startUrlStatusCode($crawl),

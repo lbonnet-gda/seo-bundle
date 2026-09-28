@@ -27,7 +27,7 @@ final class PageFetcher
     /**
      * @param bool $readHtml false to learn the status and headers only, cancelling the body
      */
-    public function fetch(string $url, int $depth = 0, bool $readHtml = true): ?PageResponse
+    public function start(string $url, int $depth = 0, bool $readHtml = true): ?PendingPage
     {
         try {
             $response = $this->httpClient->request(Request::METHOD_GET, $url, [
@@ -37,33 +37,41 @@ final class PageFetcher
                     'User-Agent' => $this->userAgent,
                 ],
             ]);
-
-            $statusCode = $response->getStatusCode();
-            /** @var array<string, list<string>> $headers */
-            $headers = $response->getHeaders(false);
-            $redirectLocation = $response->getInfo('redirect_url');
-
-            $page = new PageResponse(
-                url: $url,
-                statusCode: $statusCode,
-                headers: $headers,
-                depth: $depth,
-                redirectLocation: is_string($redirectLocation) ? $redirectLocation : null,
-            );
-
-            if (!$readHtml || !$page->isSuccessful() || !$page->isHtml()) {
-                $response->cancel();
-
-                return $page;
-            }
-
-            return $page->withHtml(
-                BoundedContentReader::read($this->httpClient, $response, self::MAX_HTML_LENGTH)
-            );
         } catch (Throwable $e) {
-            $this->logger->debug(sprintf('[Seo] Could not fetch "%s": %s', $url, $e->getMessage()));
+            $this->report($url, $e);
 
             return null;
         }
+
+        return new PendingPage($url, $depth, $response, $readHtml, self::MAX_HTML_LENGTH);
+    }
+
+    public function fetch(string $url, int $depth = 0, bool $readHtml = true): ?PageResponse
+    {
+        $pending = $this->start($url, $depth, $readHtml);
+
+        if ($pending === null) {
+            return null;
+        }
+
+        try {
+            foreach ($this->httpClient->stream($pending->response) as $chunk) {
+                if ($pending->consume($chunk)) {
+                    break;
+                }
+            }
+        } catch (Throwable $e) {
+            $pending->abandon();
+            $this->report($url, $e);
+
+            return null;
+        }
+
+        return $pending->result();
+    }
+
+    private function report(string $url, Throwable $e): void
+    {
+        $this->logger->debug(sprintf('[Seo] Could not fetch "%s": %s', $url, $e->getMessage()));
     }
 }

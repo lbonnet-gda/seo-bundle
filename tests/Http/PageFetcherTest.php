@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Lbonnet\SeoBundle\Tests\Http;
 
 use Lbonnet\SeoBundle\Http\PageFetcher;
+use Lbonnet\SeoBundle\Http\PendingPage;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class PageFetcherTest extends TestCase
 {
@@ -22,6 +24,40 @@ final class PageFetcherTest extends TestCase
 
         $this->assertSame('<html>page</html>', $response?->html);
         $this->assertSame(2, $response->depth);
+    }
+
+    public function testStartSendsTheRequestsWithoutWaitingForAnyOfThem(): void
+    {
+        $httpClient = new MockHttpClient(static fn(string $method, string $url): MockResponse => new MockResponse(
+            '<html>'.$url.'</html>',
+            ['response_headers' => ['content-type' => 'text/html; charset=UTF-8']],
+        ));
+        $fetcher = new PageFetcher($httpClient);
+
+        $pending = [];
+
+        foreach (['a', 'b', 'c'] as $path) {
+            $page = $fetcher->start('https://example.com/'.$path);
+            $this->assertNotNull($page);
+            $pending[spl_object_id($page->response)] = $page;
+        }
+
+        $this->assertSame(3, $httpClient->getRequestsCount());
+
+        $responses = array_map(static fn(PendingPage $page): ResponseInterface => $page->response, $pending);
+
+        foreach ($httpClient->stream($responses) as $response => $chunk) {
+            $pending[spl_object_id($response)]->consume($chunk);
+        }
+
+        $this->assertSame(
+            [
+                '<html>https://example.com/a</html>',
+                '<html>https://example.com/b</html>',
+                '<html>https://example.com/c</html>',
+            ],
+            array_values(array_map(static fn(PendingPage $page): ?string => $page->result()?->html, $pending)),
+        );
     }
 
     public function testItDoesNotReadTheBodyOfANonHtmlResponse(): void
