@@ -63,7 +63,7 @@ look complete.
 
 `pagesRead` counts the HTML pages parsed; `urlsChecked` counts what the crawl itself requested, redirect hops
 included. The extra requests the modules make afterward — external links, sitemaps, URL variants, canonical and
-hreflang targets — are not counted there. A
-page with no issue is still listed, so the report says what was audited, not only what is wrong. URLs that are not
-crawled pages — a redirect, a sitemap, the `http://` version of the home page — get their own entry, with `depth` set
-to `null`.
+hreflang targets — are not counted there. A page with no issue is still listed, so the report says what was audited,
+not only what is wrong; an audit running the `links` module alone is the exception, since that module only knows the
+pages carrying a link it flagged. URLs that are not crawled pages — a redirect, a sitemap, the `http://` version of
+the home page — get their own entry, with `depth` set to `null`.
