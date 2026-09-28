@@ -16,7 +16,7 @@ seo:
         exclude_patterns: # URLs matching these regexes are never requested
             - '#/admin#'
             - '#\.pdf$#'
-        request_delay_ms: 200 # minimum delay between requests to the same host; the audited host is exempt
+        request_delay_ms: 200 # delay between requests to a host, from one end to the next start; audited host exempt
         respect_robots_txt: true # skip what robots.txt disallows and honor its Crawl-delay
         allow_private_network: false # set true only to intentionally audit an internal network (SSRF risk otherwise)
 

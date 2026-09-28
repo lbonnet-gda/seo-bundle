@@ -9,7 +9,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
 final class ThrottledHttpClientTest extends TestCase
 {
@@ -35,6 +34,22 @@ final class ThrottledHttpClientTest extends TestCase
         $elapsedMs = (microtime(true) - $start) * 1000;
 
         $this->assertGreaterThanOrEqual(90, $elapsedMs);
+    }
+
+    public function testCountsTheDelayFromTheEndOfTheRequestNotFromItsStart(): void
+    {
+        $client = new ThrottledHttpClient(new MockHttpClient(static function (): MockResponse {
+            usleep(150_000);
+
+            return new MockResponse();
+        }), 100);
+
+        $start = microtime(true);
+        $client->request(Request::METHOD_GET, 'https://example.com/a');
+        $client->request(Request::METHOD_GET, 'https://example.com/b');
+        $elapsedMs = (microtime(true) - $start) * 1000;
+
+        $this->assertGreaterThanOrEqual(360, $elapsedMs);
     }
 
     public function testDoesNotDelayRequestsToDifferentHosts(): void
