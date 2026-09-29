@@ -41,6 +41,7 @@ final class SeoBundleTest extends TestCase
             'seo.disabled_checks' => [],
             'seo.crawl.max_depth' => 3,
             'seo.crawl.max_pages' => 500,
+            'seo.crawl.concurrency' => 4,
             'seo.crawl.timeout' => 10,
             'seo.crawl.user_agent' => SeoBundle::DEFAULT_USER_AGENT,
             'seo.crawl.exclude_patterns' => [],

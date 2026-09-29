@@ -11,6 +11,7 @@ seo:
     crawl:
         max_depth: 3 # crawl depth from the start URL (0 = the start page only)
         max_pages: 500 # pages read per audit before stopping; the report is then marked as truncated (0 = no limit)
+        concurrency: 4 # requests in flight at once, all hosts together; a host is still called one at a time
         timeout: 10 # per-request timeout (seconds)
         user_agent: 'Mozilla/5.0 (compatible; SeoBundle/1.0; +https://github.com/lbonnet-gda/seo-bundle)'
         exclude_patterns: # URLs matching these regexes are never requested

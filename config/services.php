@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Lbonnet\SeoBundle\Audit\SeoAuditor;
 use Lbonnet\SeoBundle\Command\CheckSeoCommand;
+use Lbonnet\SeoBundle\Http\HostRateLimiter;
 use Lbonnet\SeoBundle\Http\PageFetcher;
 use Lbonnet\SeoBundle\Http\RedirectChainResolver;
 use Lbonnet\SeoBundle\Http\RedirectChainResolverInterface;
@@ -50,6 +51,10 @@ return static function (ContainerConfigurator $container): void {
             '../src/Module/Technical/Hreflang/',
         ]);
 
+    $services->set(HostRateLimiter::class)
+        ->arg('$defaultDelayMs', param('seo.crawl.request_delay_ms'))
+        ->tag('kernel.reset', ['method' => 'reset']);
+
     $services->set(PageFetcher::class)
         ->arg('$httpClient', service('seo.http_client'))
         ->arg('$timeout', param('seo.crawl.timeout'))
@@ -70,7 +75,9 @@ return static function (ContainerConfigurator $container): void {
     $services->set(UrlChecker::class)
         ->arg('$httpClient', service('seo.http_client'))
         ->arg('$defaultTimeout', param('seo.crawl.timeout'))
-        ->arg('$userAgent', param('seo.crawl.user_agent'));
+        ->arg('$userAgent', param('seo.crawl.user_agent'))
+        ->arg('$rateLimiter', service(HostRateLimiter::class))
+        ->arg('$concurrency', param('seo.crawl.concurrency'));
 
     $services->set(LinksModule::class)
         ->arg('$disabledChecks', param('seo.disabled_checks'));

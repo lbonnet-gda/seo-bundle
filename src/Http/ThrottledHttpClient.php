@@ -12,6 +12,8 @@ use Symfony\Contracts\Service\ResetInterface;
 
 final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, ThrottleExemptionInterface
 {
+    public const SCHEDULED = 'seo.scheduled';
+
     private const IDLE_WAIT_US = 1_000;
 
     private HttpClientInterface $client;
@@ -53,7 +55,7 @@ final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, 
     {
         $host = strtolower((string)parse_url($url, PHP_URL_HOST));
 
-        if ($host !== '') {
+        if ($host !== '' && ($options['extra'][self::SCHEDULED] ?? false) !== true) {
             $this->awaitSlot($host);
         }
 
