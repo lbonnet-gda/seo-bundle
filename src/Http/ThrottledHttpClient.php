@@ -32,7 +32,7 @@ final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, 
         $this->rateLimiter = $rateLimiter ?? new HostRateLimiter($delayMs);
     }
 
-    public function setHostDelay(?string $host, int $delayMs = 0): void
+    public function setHostDelay(?string $host, int $delayMs = 0, int $maxInFlight = 1): void
     {
         if ($this->overrideHost !== null) {
             $this->rateLimiter->clearHostLimits($this->overrideHost);
@@ -44,7 +44,7 @@ final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, 
         }
 
         $this->overrideHost = strtolower($host);
-        $this->rateLimiter->setHostLimits($this->overrideHost, $delayMs);
+        $this->rateLimiter->setHostLimits($this->overrideHost, $delayMs, $maxInFlight);
     }
 
     /**

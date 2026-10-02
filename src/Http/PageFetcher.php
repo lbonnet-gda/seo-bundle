@@ -10,6 +10,8 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
+use Symfony\Contracts\HttpClient\ResponseStreamInterface;
 use Throwable;
 
 final class PageFetcher
@@ -26,8 +28,9 @@ final class PageFetcher
 
     /**
      * @param bool $readHtml false to learn the status and headers only, cancelling the body
+     * @param bool $paced true when the caller has already taken the host's slot from the shared limiter
      */
-    public function start(string $url, int $depth = 0, bool $readHtml = true): ?PendingPage
+    public function start(string $url, int $depth = 0, bool $readHtml = true, bool $paced = false): ?PendingPage
     {
         try {
             $response = $this->httpClient->request(Request::METHOD_GET, $url, [
@@ -36,6 +39,7 @@ final class PageFetcher
                 'headers' => [
                     'User-Agent' => $this->userAgent,
                 ],
+                'extra' => [ThrottledHttpClient::SCHEDULED => $paced],
             ]);
         } catch (Throwable $e) {
             $this->report($url, $e);
@@ -46,9 +50,9 @@ final class PageFetcher
         return new PendingPage($url, $depth, $response, $readHtml, self::MAX_HTML_LENGTH);
     }
 
-    public function fetch(string $url, int $depth = 0, bool $readHtml = true): ?PageResponse
+    public function fetch(string $url, int $depth = 0, bool $readHtml = true, bool $paced = false): ?PageResponse
     {
-        $pending = $this->start($url, $depth, $readHtml);
+        $pending = $this->start($url, $depth, $readHtml, $paced);
 
         if ($pending === null) {
             return null;
@@ -68,6 +72,14 @@ final class PageFetcher
         }
 
         return $pending->result();
+    }
+
+    /**
+     * @param iterable<ResponseInterface> $responses
+     */
+    public function stream(iterable $responses, ?float $timeout = null): ResponseStreamInterface
+    {
+        return $this->httpClient->stream($responses, $timeout);
     }
 
     private function report(string $url, Throwable $e): void

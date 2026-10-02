@@ -17,7 +17,7 @@ final class RedirectChainResolver implements RedirectChainResolverInterface
     ) {
     }
 
-    public function resolve(PageResponse $response): RedirectChain
+    public function resolve(PageResponse $response, bool $paced = false): RedirectChain
     {
         $startUrl = $response->url;
         $startStatusCode = $response->statusCode;
@@ -47,7 +47,7 @@ final class RedirectChainResolver implements RedirectChainResolverInterface
                 return new RedirectChain($startUrl, $startStatusCode, $hops, $location, null, truncated: true);
             }
 
-            $next = $this->pageFetcher->fetch($location, readHtml: false);
+            $next = $this->pageFetcher->fetch($location, readHtml: false, paced: $paced);
 
             if ($next === null) {
                 return new RedirectChain($startUrl, $startStatusCode, $hops, $location);

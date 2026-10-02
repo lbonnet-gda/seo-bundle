@@ -6,5 +6,5 @@ namespace Lbonnet\SeoBundle\Http;
 
 interface ThrottleExemptionInterface
 {
-    public function setHostDelay(?string $host, int $delayMs = 0): void;
+    public function setHostDelay(?string $host, int $delayMs = 0, int $maxInFlight = 1): void;
 }

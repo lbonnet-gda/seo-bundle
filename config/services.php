@@ -44,6 +44,7 @@ return static function (ContainerConfigurator $container): void {
             '../src/Crawl/CrawlOptions.php',
             '../src/Crawl/CrawledPage.php',
             '../src/Crawl/CrawlResult.php',
+            '../src/Crawl/CrawlState.php',
             '../src/Module/ModuleOptions.php',
             '../src/Module/Links/Model/',
             '../src/Module/Technical/Model/',
@@ -68,6 +69,7 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$modules', tagged_iterator('seo.module'))
         ->arg('$defaultMaxDepth', param('seo.crawl.max_depth'))
         ->arg('$defaultMaxPages', param('seo.crawl.max_pages'))
+        ->arg('$defaultConcurrency', param('seo.crawl.concurrency'))
         ->arg('$defaultExcludePatterns', param('seo.crawl.exclude_patterns'))
         ->arg('$defaultCheckExternal', param('seo.links.check_external'))
         ->arg('$disabledChecks', param('seo.disabled_checks'));
