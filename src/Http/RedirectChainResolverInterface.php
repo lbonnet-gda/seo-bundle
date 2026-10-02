@@ -15,5 +15,5 @@ interface RedirectChainResolverInterface
      *
      * @param PageResponse $response the 3xx response that starts the chain
      */
-    public function resolve(PageResponse $response): RedirectChain;
+    public function resolve(PageResponse $response, bool $paced = false): RedirectChain;
 }

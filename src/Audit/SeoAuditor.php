@@ -44,6 +44,7 @@ final class SeoAuditor implements SeoAuditorInterface
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
         private readonly int $defaultMaxDepth = 3,
         private readonly int $defaultMaxPages = 500,
+        private readonly int $defaultConcurrency = 1,
         private readonly array $defaultExcludePatterns = [],
         private readonly bool $defaultCheckExternal = true,
         array $disabledChecks = [],
@@ -75,6 +76,7 @@ final class SeoAuditor implements SeoAuditorInterface
         $options = new CrawlOptions(
             maxDepth: $maxDepth ?? $this->defaultMaxDepth,
             maxPages: $maxPages ?? $this->defaultMaxPages,
+            concurrency: $this->defaultConcurrency,
             excludePatterns: [...$this->defaultExcludePatterns, ...$excludePatterns],
             checkLinkTargets: self::includes($selectedModules, Module::Links),
             progressCallback: $progressCallback !== null ? $progressCallback(...) : null,
@@ -89,7 +91,12 @@ final class SeoAuditor implements SeoAuditorInterface
         }
 
         // Modules request the audited site too (probes, URL variants, sitemaps): the exemption covers them.
-        $throttleExemption = SiteThrottleExemption::begin($this->httpClient, $startUrl, $this->robotsTxtChecker);
+        $throttleExemption = SiteThrottleExemption::begin(
+            $this->httpClient,
+            $startUrl,
+            $this->robotsTxtChecker,
+            $this->defaultConcurrency,
+        );
 
         try {
             $crawl = $this->crawler->crawl($startUrl, $options, $throttleExemption);

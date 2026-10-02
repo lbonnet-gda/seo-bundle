@@ -14,6 +14,7 @@ final class SiteThrottleExemption
     private function __construct(
         private readonly ?ThrottleExemptionInterface $client,
         private readonly ?RobotsTxtCheckerInterface $robotsTxtChecker,
+        private readonly int $concurrency,
     ) {
     }
 
@@ -21,10 +22,12 @@ final class SiteThrottleExemption
         HttpClientInterface $httpClient,
         string $siteUrl,
         ?RobotsTxtCheckerInterface $robotsTxtChecker = null,
+        int $concurrency = 1,
     ): self {
         $exemption = new self(
             $httpClient instanceof ThrottleExemptionInterface ? $httpClient : null,
             $robotsTxtChecker,
+            $concurrency,
         );
         $exemption->moveTo($siteUrl);
 
@@ -44,7 +47,12 @@ final class SiteThrottleExemption
         }
 
         $crawlDelay = $this->robotsTxtChecker?->crawlDelay($url);
-        $this->client->setHostDelay($host, $crawlDelay !== null ? (int)round($crawlDelay * 1000) : 0);
+
+        $this->client->setHostDelay(
+            $host,
+            $crawlDelay !== null ? (int)round($crawlDelay * 1000) : 0,
+            $crawlDelay !== null ? 1 : $this->concurrency,
+        );
         $this->host = $host;
     }
 

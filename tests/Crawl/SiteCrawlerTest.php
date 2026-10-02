@@ -8,6 +8,7 @@ use Lbonnet\SeoBundle\Crawl\CrawledPage;
 use Lbonnet\SeoBundle\Crawl\CrawlOptions;
 use Lbonnet\SeoBundle\Crawl\CrawlResult;
 use Lbonnet\SeoBundle\Crawl\SiteCrawler;
+use Lbonnet\SeoBundle\Http\HostRateLimiter;
 use Lbonnet\SeoBundle\Http\PageFetcher;
 use Lbonnet\SeoBundle\Http\RedirectChainResolver;
 use Lbonnet\SeoBundle\Http\SiteThrottleExemption;
@@ -279,16 +280,16 @@ final class SiteCrawlerTest extends TestCase
             'https://example.com/' => self::redirect('https://www.example.com/'),
             'https://www.example.com/' => self::page(),
         ])) implements HttpClientInterface, ThrottleExemptionInterface {
-            /** @var list<array{0: ?string, 1: int}> */
+            /** @var list<array{0: ?string, 1: int, 2: int}> */
             public array $hostDelayCalls = [];
 
             public function __construct(private HttpClientInterface $inner)
             {
             }
 
-            public function setHostDelay(?string $host, int $delayMs = 0): void
+            public function setHostDelay(?string $host, int $delayMs = 0, int $maxInFlight = 1): void
             {
-                $this->hostDelayCalls[] = [$host, $delayMs];
+                $this->hostDelayCalls[] = [$host, $delayMs, $maxInFlight];
             }
 
             public function request(string $method, string $url, array $options = []): ResponseInterface
@@ -317,14 +318,88 @@ final class SiteCrawlerTest extends TestCase
         $exemption->end();
 
         $this->assertSame(
-            [['example.com', 0], ['www.example.com', 0], [null, 0]],
+            [['example.com', 0, 1], ['www.example.com', 0, 1], [null, 0, 1]],
             $httpClient->hostDelayCalls,
         );
     }
 
+    public function testReadsSeveralPagesAtOnceWhenTheHostAllowsIt(): void
+    {
+        $limiter = new HostRateLimiter();
+        $limiter->setHostLimits('example.com', 0, 3);
+
+        [$crawl, $peak] = $this->crawlCountingRequestsInFlight(new CrawlOptions(concurrency: 3), $limiter);
+
+        $this->assertCount(4, $crawl->pages);
+        $this->assertSame(3, $peak);
+    }
+
+    public function testReadsOnePageAtATimeWhenTheHostIsGivenASingleSlot(): void
+    {
+        [$crawl, $peak] = $this->crawlCountingRequestsInFlight(new CrawlOptions(concurrency: 3));
+
+        $this->assertCount(4, $crawl->pages);
+        $this->assertSame(1, $peak);
+    }
+
+    public function testOrdersThePagesByDepthAndUrlWhateverTheAnswersOrder(): void
+    {
+        $site = [
+            'https://example.com/' => self::page('<a href="/c">C</a><a href="/b">B</a><a href="/a">A</a>'),
+            'https://example.com/a' => self::page(),
+            'https://example.com/b' => self::page(),
+            'https://example.com/c' => self::page('<a href="/d">D</a>'),
+            'https://example.com/d' => self::page(),
+        ];
+
+        $crawl = $this->crawl($site, new CrawlOptions(concurrency: 4));
+
+        $this->assertSame(
+            [
+                'https://example.com/',
+                'https://example.com/a',
+                'https://example.com/b',
+                'https://example.com/c',
+                'https://example.com/d',
+            ],
+            self::urls($crawl),
+        );
+    }
+
     /**
-     * @param array<string, array{string, array<string, mixed>}> $site
+     * @return array{CrawlResult, int}
      */
+    private function crawlCountingRequestsInFlight(CrawlOptions $options, ?HostRateLimiter $limiter = null): array
+    {
+        $inFlight = 0;
+        $peak = 0;
+        $site = [
+            'https://example.com/' => '<a href="/a">A</a><a href="/b">B</a><a href="/c">C</a>',
+            'https://example.com/a' => '',
+            'https://example.com/b' => '',
+            'https://example.com/c' => '',
+        ];
+        $httpClient = new MockHttpClient(
+            static function (string $method, string $url) use (&$inFlight, &$peak, $site): MockResponse {
+                $inFlight++;
+                $peak = max($peak, $inFlight);
+                $body = '<!DOCTYPE html><html><head><title>T</title></head><body>'
+                    .($site[$url] ?? '').'</body></html>';
+
+                return new MockResponse(
+                    (static function () use (&$inFlight, $body): iterable {
+                        $inFlight--;
+
+                        yield $body;
+                    })(),
+                    ['response_headers' => ['content-type' => 'text/html; charset=UTF-8']],
+                );
+            }
+        );
+
+        return [$this->crawler($httpClient, rateLimiter: $limiter)->crawl('https://example.com/', $options), $peak];
+    }
+
     private function crawl(
         array $site,
         CrawlOptions $options = new CrawlOptions(),
@@ -336,6 +411,7 @@ final class SiteCrawlerTest extends TestCase
     private function crawler(
         HttpClientInterface $httpClient,
         ?RobotsTxtCheckerInterface $robotsTxtChecker = null,
+        ?HostRateLimiter $rateLimiter = null,
     ): SiteCrawler {
         $pageFetcher = new PageFetcher($httpClient);
 
@@ -343,6 +419,7 @@ final class SiteCrawlerTest extends TestCase
             $pageFetcher,
             new RedirectChainResolver($pageFetcher),
             robotsTxtChecker: $robotsTxtChecker,
+            rateLimiter: $rateLimiter,
         );
     }
 

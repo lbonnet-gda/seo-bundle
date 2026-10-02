@@ -61,10 +61,13 @@ final class LinksModule implements ModuleInterface
         }
 
         if ($options->checkExternal && !$this->disabledChecks->hasAll(self::EXTERNAL_CHECKS)) {
-            foreach ($crawl->externalLinks() as $url => $entries) {
-                $result = $this->urlChecker->check($url);
+            $externalLinks = $crawl->externalLinks();
+            $checks = $this->urlChecker->checkMany(array_keys($externalLinks));
 
-                if (!$result->isBroken()) {
+            foreach ($externalLinks as $url => $entries) {
+                $result = $checks[$url] ?? null;
+
+                if ($result === null || !$result->isBroken()) {
                     continue;
                 }
 

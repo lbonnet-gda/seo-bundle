@@ -22,7 +22,7 @@ final class SiteThrottleExemptionTest extends TestCase
 
         SiteThrottleExemption::begin($client, 'https://example.com/page');
 
-        $this->assertSame([['example.com', 0]], $client->hostDelayCalls);
+        $this->assertSame([['example.com', 0, 1]], $client->hostDelayCalls);
     }
 
     public function testBeginHonorsTheSiteRobotsTxtCrawlDelay(): void
@@ -33,7 +33,7 @@ final class SiteThrottleExemptionTest extends TestCase
 
         SiteThrottleExemption::begin($client, 'https://example.com', $robotsTxtChecker);
 
-        $this->assertSame([['example.com', 2500]], $client->hostDelayCalls);
+        $this->assertSame([['example.com', 2500, 1]], $client->hostDelayCalls);
     }
 
     public function testMoveToAnotherHostExemptsThatHostWithItsOwnCrawlDelay(): void
@@ -48,7 +48,7 @@ final class SiteThrottleExemptionTest extends TestCase
         $exemption = SiteThrottleExemption::begin($client, 'https://example.com', $robotsTxtChecker);
         $exemption->moveTo('https://www.example.com/fr');
 
-        $this->assertSame([['example.com', 0], ['www.example.com', 1000]], $client->hostDelayCalls);
+        $this->assertSame([['example.com', 0, 1], ['www.example.com', 1000, 1]], $client->hostDelayCalls);
     }
 
     public function testMoveToTheSameHostDoesNothing(): void
@@ -60,7 +60,7 @@ final class SiteThrottleExemptionTest extends TestCase
         $exemption = SiteThrottleExemption::begin($client, 'https://example.com', $robotsTxtChecker);
         $exemption->moveTo('https://EXAMPLE.com/other-page');
 
-        $this->assertSame([['example.com', 0]], $client->hostDelayCalls);
+        $this->assertSame([['example.com', 0, 1]], $client->hostDelayCalls);
     }
 
     public function testEndClearsTheExemptionOnce(): void
@@ -71,7 +71,7 @@ final class SiteThrottleExemptionTest extends TestCase
         $exemption->end();
         $exemption->end();
 
-        $this->assertSame([['example.com', 0], [null, 0]], $client->hostDelayCalls);
+        $this->assertSame([['example.com', 0, 1], [null, 0, 1]], $client->hostDelayCalls);
     }
 
     public function testASiteUrlWithoutHostExemptsNothing(): void
@@ -95,12 +95,12 @@ final class SiteThrottleExemptionTest extends TestCase
     private static function spyClient(): ThrottleExemptionInterface|HttpClientInterface
     {
         return new class implements HttpClientInterface, ThrottleExemptionInterface {
-            /** @var list<array{0: ?string, 1: int}> */
+            /** @var list<array{0: ?string, 1: int, 2: int}> */
             public array $hostDelayCalls = [];
 
-            public function setHostDelay(?string $host, int $delayMs = 0): void
+            public function setHostDelay(?string $host, int $delayMs = 0, int $maxInFlight = 1): void
             {
-                $this->hostDelayCalls[] = [$host, $delayMs];
+                $this->hostDelayCalls[] = [$host, $delayMs, $maxInFlight];
             }
 
             public function request(string $method, string $url, array $options = []): ResponseInterface

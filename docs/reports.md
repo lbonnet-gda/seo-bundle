@@ -67,3 +67,7 @@ hreflang targets — are not counted there. A page with no issue is still listed
 not only what is wrong; an audit running the `links` module alone is the exception, since that module only knows the
 pages carrying a link it flagged. URLs that are not crawled pages — a redirect, a sitemap, the `http://` version of
 the home page — get their own entry, with `depth` set to `null`.
+
+Pages are listed by depth, then by URL. Since answers come back in whatever order the network decides, crawl order
+would differ from one audit to the next; sorting them means the same site always produces the same report, which is
+what makes two reports worth comparing.

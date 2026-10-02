@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle;
 
+use Lbonnet\SeoBundle\Http\HostRateLimiter;
 use Lbonnet\SeoBundle\Http\ThrottledHttpClient;
 use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\Severity;
@@ -73,6 +74,7 @@ final class SeoBundle extends AbstractBundle
      *     crawl: array{
      *         max_depth: int,
      *         max_pages: int,
+     *         concurrency: int,
      *         timeout: int,
      *         user_agent: string,
      *         exclude_patterns: list<string>,
@@ -119,7 +121,11 @@ final class SeoBundle extends AbstractBundle
         }
 
         $builder->register('seo.http_client', ThrottledHttpClient::class)
-            ->setArguments([new Reference($privateNetworkGuardId), $config['crawl']['request_delay_ms']])
+            ->setArguments([
+                new Reference($privateNetworkGuardId),
+                $config['crawl']['request_delay_ms'],
+                new Reference(HostRateLimiter::class),
+            ])
             ->addTag('kernel.reset', ['method' => 'reset']);
 
         if (!$config['links']['enabled']) {
@@ -153,6 +159,14 @@ final class SeoBundle extends AbstractBundle
             ->min(0)
             ->info(
                 'Maximum number of pages read per audit; the crawl stops there and the report is marked as truncated. Set to 0 for no limit.'
+            )
+            ->end();
+
+        $crawl->integerNode('concurrency')
+            ->defaultValue(4)
+            ->min(1)
+            ->info(
+                'How many requests may be in flight at once, all hosts taken together. A host is still called one request at a time, and one after its own delay, so raising this only helps when several hosts are involved. Set to 1 to send everything one by one.'
             )
             ->end();
 

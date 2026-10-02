@@ -5,22 +5,34 @@ declare(strict_types=1);
 namespace Lbonnet\SeoBundle\Crawl;
 
 use Lbonnet\SeoBundle\Html\HtmlPageParser;
+use Lbonnet\SeoBundle\Http\HostRateLimiter;
 use Lbonnet\SeoBundle\Http\PageFetcher;
+use Lbonnet\SeoBundle\Http\PendingPage;
 use Lbonnet\SeoBundle\Http\RedirectChainResolverInterface;
 use Lbonnet\SeoBundle\Http\SiteThrottleExemption;
+use Lbonnet\SeoBundle\Model\PageLink;
+use Lbonnet\SeoBundle\Model\PageResponse;
 use Lbonnet\SeoBundle\Model\RedirectChain;
 use Lbonnet\SeoBundle\Robots\RobotsTxtCheckerInterface;
 use Lbonnet\SeoBundle\Url\UrlPattern;
 use Lbonnet\SeoBundle\Url\UrlResolver;
+use Symfony\Contracts\HttpClient\ResponseInterface;
+use Throwable;
 
 final class SiteCrawler
 {
+    private const IDLE_WAIT_US = 1_000;
+
+    private readonly HostRateLimiter $rateLimiter;
+
     public function __construct(
         private readonly PageFetcher $pageFetcher,
         private readonly RedirectChainResolverInterface $redirectChainResolver,
         private readonly HtmlPageParser $parser = new HtmlPageParser(),
         private readonly ?RobotsTxtCheckerInterface $robotsTxtChecker = null,
+        ?HostRateLimiter $rateLimiter = null,
     ) {
+        $this->rateLimiter = $rateLimiter ?? new HostRateLimiter();
     }
 
     /**
@@ -31,151 +43,304 @@ final class SiteCrawler
         CrawlOptions $options,
         ?SiteThrottleExemption $throttleExemption = null,
     ): CrawlResult {
-        /** @var array<string, true> $visited */
-        $visited = [];
-        /** @var array<string, true> $bodySkipped */
-        $bodySkipped = [];
-        $responses = [];
-        /** @var array<string, RedirectChain> $chains */
-        $chains = [];
-        /** @var array<string, string> $unreachable */
-        $unreachable = [];
-        /** @var array<string, string> $disallowed dedup key => internal URL robots.txt keeps us from reading */
-        $disallowed = [];
-        /** @var list<CrawledPage> $pages */
-        $pages = [];
-        $urlsChecked = 0;
-        $truncated = false;
+        $state = new CrawlState($startUrl);
 
-        /** @var list<array{url: string, depth: int, read: bool, force: bool}> $queue */
-        $queue = [['url' => $startUrl, 'depth' => 0, 'read' => true, 'force' => false]];
+        while ($state->busy()) {
+            $this->dispatch($state, $options);
+            $this->walkRedirects($state, $options, $throttleExemption);
 
-        $startKey = UrlResolver::dedupKey($startUrl);
-        $siteHost = UrlResolver::hostOf($startUrl);
-        $siteUrl = $startUrl;
+            if ($state->inFlight === []) {
+                if ($state->queue === [] && $state->redirects === []) {
+                    break;
+                }
 
-        while ($queue !== []) {
-            ['url' => $url, 'depth' => $depth, 'read' => $read, 'force' => $force] = array_shift($queue);
-            $key = UrlResolver::dedupKey($url);
+                usleep(self::IDLE_WAIT_US);
 
-            if (isset($visited[$key]) && !$force && !($read && isset($bodySkipped[$key]))) {
                 continue;
             }
 
-            if ($read && $options->maxPages > 0 && count($pages) >= $options->maxPages) {
-                $truncated = true;
+            $this->settle($state, $options);
+        }
+
+        return new CrawlResult(
+            startUrl: $startUrl,
+            siteUrl: $state->siteUrl,
+            pages: $state->pages(),
+            responses: $state->responses,
+            redirectChains: $state->chains,
+            unreachable: $state->unreachable,
+            disallowed: $state->disallowed,
+            urlsChecked: $state->urlsChecked,
+            truncated: $state->truncated,
+            blockedByRobotsTxt: $this->robotsTxtChecker?->isSiteBlocked($state->siteUrl) === true,
+        );
+    }
+
+    private function dispatch(CrawlState $state, CrawlOptions $options): void
+    {
+        $waiting = [];
+
+        foreach ($state->queue as $item) {
+            if ($state->stopped) {
+                break;
+            }
+
+            $key = UrlResolver::dedupKey($item['url']);
+
+            if (isset($state->inFlightKeys[$key])) {
+                $waiting[] = $item;
+
+                continue;
+            }
+
+            $read = $item['read'];
+
+            if (isset($state->visited[$key]) && !$item['force'] && !($read && isset($state->bodySkipped[$key]))) {
+                continue;
+            }
+
+            if ($read && $options->maxPages > 0 && $state->pagesDispatched >= $options->maxPages) {
+                $state->truncated = true;
 
                 if (!$options->checkLinkTargets) {
+                    $state->stopped = true;
+
                     break;
                 }
 
                 $read = false;
             }
 
-            $visited[$key] = true;
-            $response = $this->pageFetcher->fetch($url, $depth, $read);
-            $urlsChecked++;
+            $host = UrlResolver::hostOf($item['url']) ?? '';
 
-            if ($response === null) {
-                unset($bodySkipped[$key]);
-                $unreachable[$key] = $url;
+            if (count($state->inFlight) >= max(1, $options->concurrency) || !$this->take($host)) {
+                $waiting[] = $item;
 
                 continue;
             }
 
-            if ($read) {
-                unset($bodySkipped[$key]);
-            } else {
-                $bodySkipped[$key] = true;
-            }
+            $this->send($state, $item['url'], $item['depth'], $read, $key, $host);
+        }
 
-            $responses[$key] = $response;
+        $state->queue = $state->stopped ? [] : $waiting;
+    }
 
-            if ($response->isRedirect()) {
-                $chain = $this->redirectChainResolver->resolve($response);
-                $chains[$key] = $chain;
-                $urlsChecked += $chain->isLoop || $chain->truncated ? $chain->hopCount() - 1 : $chain->hopCount();
-                $finalUrl = $chain->finalUrl;
+    private function send(CrawlState $state, string $url, int $depth, bool $read, string $key, string $host): void
+    {
+        $state->visited[$key] = true;
+        $state->urlsChecked++;
 
-                if ($key === $startKey && $finalUrl !== null && $chain->endsSuccessfully()) {
-                    $finalHost = UrlResolver::hostOf($finalUrl);
+        if ($read) {
+            $state->pagesDispatched++;
+        }
 
-                    if ($finalHost !== null && strcasecmp($finalHost, (string)$siteHost) !== 0) {
-                        $siteHost = $finalHost;
-                        $siteUrl = $finalUrl;
-                        $throttleExemption?->moveTo($finalUrl);
-                    }
-                }
+        $pending = $this->pageFetcher->start($url, $depth, $read, paced: true);
 
-                if (
-                    $read
-                    && $finalUrl !== null
-                    && !$chain->isLoop
-                    && $chain->finalStatusCode !== null
-                    && $this->isCrawlable($finalUrl, $siteHost, $options->excludePatterns, $disallowed)
-                ) {
-                    // A redirect from http:// to https:// lands on a URL sharing its dedup key: it is the page we
-                    // came for, so it must be read even though that key is already marked visited.
-                    $queue[] = [
-                        'url' => $finalUrl,
-                        'depth' => $depth,
-                        'read' => true,
-                        'force' => UrlResolver::dedupKey($finalUrl) === $key,
-                    ];
-                }
+        if ($pending === null) {
+            $this->give($host);
+            unset($state->bodySkipped[$key]);
+            $state->unreachable[$key] = $url;
 
-                continue;
-            }
+            return;
+        }
 
-            if (!$read || $response->html === null) {
-                continue;
-            }
+        $state->inFlight[spl_object_id($pending->response)] = [
+            'url' => $url,
+            'depth' => $depth,
+            'read' => $read,
+            'key' => $key,
+            'host' => $host,
+            'seq' => $state->dispatched++,
+            'pending' => $pending,
+        ];
+        $state->inFlightKeys[$key] = true;
+    }
 
-            $signals = $this->parser->parse($response->html, $url, $options->excludePatterns);
-            $pages[] = new CrawledPage($url, $depth, $response, $signals);
+    private function settle(CrawlState $state, CrawlOptions $options): void
+    {
+        $responses = array_map(
+            static fn(array $entry): ResponseInterface => $entry['pending']->response,
+            $state->inFlight,
+        );
 
-            if ($options->progressCallback !== null) {
-                ($options->progressCallback)($url, count($pages));
-            }
+        foreach ($this->pageFetcher->stream($responses) as $response => $chunk) {
+            $entry = $state->inFlight[spl_object_id($response)];
 
-            $readLinks = $depth < $options->maxDepth;
-
-            if (!$readLinks && !$options->checkLinkTargets) {
-                continue;
-            }
-
-            foreach ($signals->links as $link) {
-                $linkKey = UrlResolver::dedupKey($link->url);
-
-                $alreadyRequested = isset($visited[$linkKey]);
-                $readableNow = $readLinks && isset($bodySkipped[$linkKey]);
-
-                if ($link->isExternal || ($alreadyRequested && !$readableNow)) {
+            try {
+                if (!$entry['pending']->consume($chunk)) {
                     continue;
                 }
 
-                if ($this->isDisallowed($link->url)) {
-                    $disallowed[$linkKey] = $link->url;
+                $answer = $entry['pending']->result();
+            } catch (Throwable $e) {
+                $entry['pending']->abandon();
+                $answer = null;
+            }
 
-                    continue;
-                }
+            unset($state->inFlight[spl_object_id($response)], $state->inFlightKeys[$entry['key']]);
+            $this->give($entry['host']);
+            $this->accept($state, $options, $entry, $answer);
 
-                $queue[] = ['url' => $link->url, 'depth' => $depth + 1, 'read' => $readLinks, 'force' => false];
+            return;
+        }
+    }
+
+    /**
+     * @param array{url: string, depth: int, read: bool, key: string, host: string, seq: int, pending: PendingPage} $entry
+     */
+    private function accept(CrawlState $state, CrawlOptions $options, array $entry, ?PageResponse $answer): void
+    {
+        $key = $entry['key'];
+
+        if ($answer === null) {
+            unset($state->bodySkipped[$key]);
+            $state->unreachable[$key] = $entry['url'];
+
+            return;
+        }
+
+        if ($entry['read']) {
+            unset($state->bodySkipped[$key]);
+        } else {
+            $state->bodySkipped[$key] = true;
+        }
+
+        $state->responses[$key] = $answer;
+
+        if ($answer->isRedirect()) {
+            $state->redirects[] = [
+                'url' => $entry['url'],
+                'depth' => $entry['depth'],
+                'host' => $entry['host'],
+                'response' => $answer,
+            ];
+
+            return;
+        }
+
+        if (!$entry['read'] || $answer->html === null) {
+            return;
+        }
+
+        $signals = $this->parser->parse($answer->html, $entry['url'], $options->excludePatterns);
+        $state->pages[$entry['seq']] = new CrawledPage($entry['url'], $entry['depth'], $answer, $signals);
+
+        if ($options->progressCallback !== null) {
+            ($options->progressCallback)($entry['url'], count($state->pages));
+        }
+
+        $this->queueLinks($state, $options, $entry['url'], $entry['depth'], $signals->links);
+    }
+
+    /**
+     * @param list<PageLink> $links
+     */
+    private function queueLinks(CrawlState $state, CrawlOptions $options, string $url, int $depth, array $links): void
+    {
+        $readLinks = $depth < $options->maxDepth;
+
+        if (!$readLinks && !$options->checkLinkTargets) {
+            return;
+        }
+
+        foreach ($links as $link) {
+            $linkKey = UrlResolver::dedupKey($link->url);
+            $alreadyRequested = isset($state->visited[$linkKey]);
+            $readableNow = $readLinks && isset($state->bodySkipped[$linkKey]);
+
+            if ($link->isExternal || ($alreadyRequested && !$readableNow)) {
+                continue;
+            }
+
+            if ($this->isDisallowed($link->url)) {
+                $state->disallowed[$linkKey] = $link->url;
+
+                continue;
+            }
+
+            $state->queue[] = ['url' => $link->url, 'depth' => $depth + 1, 'read' => $readLinks, 'force' => false];
+        }
+    }
+
+    private function walkRedirects(
+        CrawlState $state,
+        CrawlOptions $options,
+        ?SiteThrottleExemption $throttleExemption,
+    ): void {
+        $waiting = [];
+
+        foreach ($state->redirects as $redirect) {
+            if (!$this->take($redirect['host'])) {
+                $waiting[] = $redirect;
+
+                continue;
+            }
+
+            $chain = $this->redirectChainResolver->resolve($redirect['response'], paced: true);
+            $this->give($redirect['host']);
+
+            $key = UrlResolver::dedupKey($redirect['url']);
+            $state->chains[$key] = $chain;
+            $state->urlsChecked += $chain->isLoop || $chain->truncated ? $chain->hopCount() - 1 : $chain->hopCount();
+
+            $this->followChain($state, $options, $redirect, $chain, $key, $throttleExemption);
+        }
+
+        $state->redirects = $state->stopped ? [] : $waiting;
+    }
+
+    /**
+     * @param array{url: string, depth: int, host: string, response: PageResponse} $redirect
+     */
+    private function followChain(
+        CrawlState $state,
+        CrawlOptions $options,
+        array $redirect,
+        RedirectChain $chain,
+        string $key,
+        ?SiteThrottleExemption $throttleExemption,
+    ): void {
+        $finalUrl = $chain->finalUrl;
+
+        if ($key === UrlResolver::dedupKey($state->startUrl) && $finalUrl !== null && $chain->endsSuccessfully()) {
+            $finalHost = UrlResolver::hostOf($finalUrl);
+
+            if ($finalHost !== null && strcasecmp($finalHost, (string)$state->siteHost) !== 0) {
+                $state->siteHost = $finalHost;
+                $state->siteUrl = $finalUrl;
+                $throttleExemption?->moveTo($finalUrl);
             }
         }
 
-        return new CrawlResult(
-            startUrl: $startUrl,
-            siteUrl: $siteUrl,
-            pages: $pages,
-            responses: $responses,
-            redirectChains: $chains,
-            unreachable: $unreachable,
-            disallowed: $disallowed,
-            urlsChecked: $urlsChecked,
-            truncated: $truncated,
-            blockedByRobotsTxt: $this->robotsTxtChecker?->isSiteBlocked($siteUrl) === true,
-        );
+        if (
+            $finalUrl === null
+            || $chain->isLoop
+            || $chain->finalStatusCode === null
+            || !$this->isCrawlable($finalUrl, $state->siteHost, $options->excludePatterns, $state->disallowed)
+        ) {
+            return;
+        }
+
+        // A redirect from http:// to https:// lands on a URL sharing its dedup key: it is the page we came for,
+        // so it must be read even though that key is already marked visited.
+        $state->queue[] = [
+            'url' => $finalUrl,
+            'depth' => $redirect['depth'],
+            'read' => true,
+            'force' => UrlResolver::dedupKey($finalUrl) === $key,
+        ];
+    }
+
+    private function take(string $host): bool
+    {
+        return $host === '' || $this->rateLimiter->tryAcquire($host);
+    }
+
+    private function give(string $host): void
+    {
+        if ($host !== '') {
+            $this->rateLimiter->release($host);
+        }
     }
 
     /**
