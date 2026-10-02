@@ -1,6 +1,8 @@
 # Reports
 
-Unless `storage.dir` is disabled, each audit is stored as JSON:
+Unless `storage.dir` is disabled, each audit is stored as JSON in that directory, one file per audit, named
+`report-<date>-<hash>-<id>.json`. `<hash>` is derived from the start URL, so all the reports of one site share it,
+and past `storage.max_reports` files for that URL the oldest are deleted.
 
 ```json
 {
@@ -56,6 +58,13 @@ Unless `storage.dir` is disabled, each audit is stored as JSON:
 `startUrlStatusCode` is null as long as the audit read at least one page. When it read none — the start URL
 answers an error, redirects to one, or cannot be requested at all (then `0`) — it carries that status, the
 console command fails, and nothing else in the report is meaningful.
+
+`truncated` is true when the crawl stopped at `crawl.max_pages`: the site was only partly audited, and pages it did
+not reach are neither listed nor checked.
+
+`blockedByRobotsTxt` is true when the site's `robots.txt` answers a server error (5xx, 429, or no response at all).
+Like Google, the crawl then goes no further than the start page. It is always false with
+`crawl.respect_robots_txt: false`.
 
 `urlsDisallowedByRobotsTxt` counts the internal URLs the crawl left out because `robots.txt` disallows them for
 the configured user agent. They are audited by nobody, so the console command says so rather than letting the report
