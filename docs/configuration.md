@@ -10,7 +10,7 @@ seo:
 
     crawl:
         max_depth: 3 # crawl depth from the start URL (0 = the start page only)
-        max_pages: 500 # pages read per audit before stopping; the report is then marked as truncated (0 = no limit)
+        max_pages: 500 # pages the crawl may ask to read before stopping; the report is then truncated (0 = no limit)
         concurrency: 4 # requests in flight at once, all hosts together; a host is still called one at a time
         timeout: 10 # per-request timeout (seconds)
         user_agent: 'Mozilla/5.0 (compatible; SeoBundle/1.0; +https://github.com/lbonnet-gda/seo-bundle)'
@@ -39,6 +39,11 @@ seo:
         dir: '%kernel.project_dir%/var/seo' # JSON reports directory; set to null/empty to disable
         max_reports: 30 # oldest reports are deleted past this count per audited URL (0 = keep forever)
 ```
+
+`max_pages` counts the pages the crawl asks for, not the ones it ends up reading: the limit has to be applied
+when a request goes out, or the set of pages an audit covers would depend on which answers came back first. A URL
+that turns out to be a redirect or a PDF therefore counts against it, so a truncated audit can hold slightly fewer
+pages than the limit.
 
 `disabled_checks` values are validated against the known issue types at container build time, and `exclude_patterns`
 entries against the regex engine, so a typo fails fast instead of silently doing nothing. A pattern missing its
