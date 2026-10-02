@@ -69,11 +69,13 @@ check. The audit also runs as a Messenger message, on a schedule, or behind your
 
 ## Known trade-offs
 
-- **Requests go out one at a time.** The crawl and the external link checks are sequential, so a large audit takes as
-  long as the network makes it. Concurrency is planned and needs non-blocking per-host throttling first.
+- **A host is only ever called one request at a time.** Requests run concurrently — `crawl.concurrency` of them — but
+  never two at once to the same host, and never before that host's delay has elapsed since the last answer. The audited
+  site is the exception the setting exists for: it is given those slots, unless its `robots.txt` asks for a
+  `Crawl-delay`, which puts it back to one at a time. So concurrency pays off on a site, not against one.
 - **A redirect target is requested twice**: once while resolving the chain (headers only, the body is canceled), then
   again to read its markup. This keeps chain resolution independent of crawling, at the cost of one extra HEAD-sized
-  request per redirect.
+  request per redirect. Chains are walked one hop at a time, while the rest of the crawl carries on.
 - **Pages are read with libxml**, not with DomCrawler, whose parser changes across PHP and Symfony versions and,
   through `masterminds/html5`, never closes `<head>` early. Like browsers, libxml closes `<head>` on the usual culprits
   (a stray `<div>`, a tracking `<img>`, stray text, a misplaced `<iframe>`), but not on an `<svg>` or a custom element.
