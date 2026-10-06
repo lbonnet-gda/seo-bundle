@@ -15,6 +15,17 @@ modules for that run.
 > the command exit with `1`. That way a warning-level finding shows up in the build log without breaking the pipeline,
 > and you can tighten the threshold once the site is clean.
 
+| Exit code | When                                                                                  |
+|-----------|---------------------------------------------------------------------------------------|
+| `0`       | No issue at or above `--fail-on`, or another `seo:check` was already running (below)  |
+| `1`       | An issue at or above `--fail-on`, or the start URL answers an error or is unreachable |
+| `2`       | Invalid input: no URL at all, or a wrong `--fail-on`, `--only` or `--exclude` value   |
+
+> [!WARNING]
+> Only one `seo:check` runs at a time on a machine. A second one started while the first is still running prints a
+> warning and exits with `0` without auditing anything, so a CI job or a cron overlapping a previous run passes without
+> having checked the site. Space out the runs, or look for "already running" in the output.
+
 ### 2. Asynchronous Execution (Messenger)
 
 ```php
@@ -32,8 +43,26 @@ public function triggerAudit(MessageBusInterface $bus): void
         excludePatterns: ['#/preview#'],
         maxPages: 100,
         modules: ['links', 'technical'],
+        checkExternal: false,
     ));
 }
+```
+
+Every argument left out falls back to the bundle configuration, as the command options do; `checkExternal: false` is
+the equivalent of `--no-external`, and `excludePatterns` adds to `crawl.exclude_patterns` like `--exclude`. A message
+with an invalid URL, pattern or module is logged as an error and dropped, without auditing anything.
+
+The audit only runs outside the request if the message goes through an asynchronous transport. Without a route,
+Messenger handles it synchronously, in the request that dispatched it:
+
+```yaml
+# config/packages/messenger.yaml
+framework:
+    messenger:
+        transports:
+            async: '%env(MESSENGER_TRANSPORT_DSN)%'
+        routing:
+            Lbonnet\SeoBundle\Message\CheckSeoMessage: async
 ```
 
 ### 3. Automated Monitoring (Symfony Scheduler)
