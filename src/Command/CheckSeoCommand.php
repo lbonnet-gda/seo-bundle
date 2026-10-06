@@ -45,7 +45,7 @@ final class CheckSeoCommand extends Command
                 'max-pages',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Override the maximum number of pages read (0 = no limit)'
+                'Override the maximum number of pages the crawl may ask to read (0 = no limit)'
             )
             ->addOption(
                 'exclude',
