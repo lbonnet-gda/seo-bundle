@@ -190,6 +190,32 @@ final class SiteCrawlerTest extends TestCase
         }
     }
 
+    public function testARedirectDoesNotCostAPageOfTheMaxPagesBudget(): void
+    {
+        $site = [
+            'https://example.com/' => self::redirect('https://example.com/home'),
+            'https://example.com/home' => self::page(),
+        ];
+
+        $crawl = $this->crawl($site, new CrawlOptions(maxPages: 1));
+
+        $this->assertSame(['https://example.com/home'], self::urls($crawl));
+    }
+
+    public function testAnswersThatAreNotPagesDoNotCostAPageEither(): void
+    {
+        $site = [
+            'https://example.com/' => self::page('<a href="/a.pdf">PDF</a><a href="/one">1</a>'),
+            'https://example.com/a.pdf' => ['%PDF-1.4', ['response_headers' => ['content-type' => 'application/pdf']]],
+            'https://example.com/one' => self::page(),
+        ];
+
+        $crawl = $this->crawl($site, new CrawlOptions(maxPages: 2));
+
+        $this->assertSame(['https://example.com/', 'https://example.com/one'], self::urls($crawl));
+        $this->assertFalse($crawl->truncated);
+    }
+
     public function testFollowsTheSiteWhenTheStartUrlRedirectsToAnotherHost(): void
     {
         $crawl = $this->crawl([
