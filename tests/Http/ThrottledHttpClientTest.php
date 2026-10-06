@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle\Tests\Http;
 
+use Lbonnet\SeoBundle\Http\HostRateLimiter;
 use Lbonnet\SeoBundle\Http\ThrottledHttpClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 final class ThrottledHttpClientTest extends TestCase
 {
@@ -22,6 +24,60 @@ final class ThrottledHttpClientTest extends TestCase
         $elapsedMs = (microtime(true) - $start) * 1000;
 
         $this->assertLessThan(50, $elapsedMs);
+    }
+
+    public function testGivesTheHostSlotBackOnceTheResponseHasBeenRead(): void
+    {
+        [$client, $limiter] = $this->sharedLimiterClient();
+
+        $client->request(Request::METHOD_GET, 'https://example.com/robots.txt')->getContent();
+
+        $this->assertSame(4, self::freeSlots($limiter));
+    }
+
+    public function testGivesTheHostSlotBackWhenOnlyTheHeadersAreLookedAt(): void
+    {
+        [$client, $limiter] = $this->sharedLimiterClient();
+
+        $response = $client->request(Request::METHOD_GET, 'https://example.com/a');
+        $response->getStatusCode();
+        unset($response);
+
+        $this->assertSame(4, self::freeSlots($limiter));
+    }
+
+    public function testDoesNotKeepASlotForAResponseItsCallerHasMovedOnFrom(): void
+    {
+        [$client, $limiter] = $this->sharedLimiterClient();
+
+        $held = $client->request(Request::METHOD_GET, 'https://example.com/a');
+        $client->request(Request::METHOD_GET, 'https://example.com/b')->getContent();
+
+        $this->assertSame(4, self::freeSlots($limiter));
+        $this->assertSame(Response::HTTP_OK, $held->getStatusCode());
+    }
+
+    /**
+     * @return array{ThrottledHttpClient, HostRateLimiter}
+     */
+    private function sharedLimiterClient(): array
+    {
+        $limiter = new HostRateLimiter();
+        $limiter->setHostLimits('example.com', 0, 4);
+        $client = new ThrottledHttpClient(new MockHttpClient(static fn() => new MockResponse('ok')), 0, $limiter);
+
+        return [$client, $limiter];
+    }
+
+    private static function freeSlots(HostRateLimiter $limiter): int
+    {
+        $slots = 0;
+
+        while ($limiter->tryAcquire('example.com')) {
+            $slots++;
+        }
+
+        return $slots;
     }
 
     public function testDelaysConsecutiveRequestsToTheSameHost(): void
@@ -99,6 +155,7 @@ final class ThrottledHttpClientTest extends TestCase
 
         $start = microtime(true);
         $client->request(Request::METHOD_GET, 'https://example.com/b');
+        $client->request(Request::METHOD_GET, 'https://example.com/c');
         $elapsedMs = (microtime(true) - $start) * 1000;
 
         $this->assertGreaterThanOrEqual(90, $elapsedMs);

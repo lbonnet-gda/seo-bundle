@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle\Http;
 
+use Generator;
+use SplObjectStorage;
+use Symfony\Component\HttpClient\Response\ResponseStream;
+use Symfony\Contracts\HttpClient\ChunkInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 use Symfony\Contracts\HttpClient\ResponseStreamInterface;
 use Symfony\Contracts\Service\ResetInterface;
+use Throwable;
 
 final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, ThrottleExemptionInterface
 {
@@ -19,8 +24,9 @@ final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, 
     private HttpClientInterface $client;
     private readonly HostRateLimiter $rateLimiter;
     private ?string $overrideHost = null;
+    private int $leases = 0;
 
-    /** @var array<string, true> hosts whose slot this client is still holding */
+    /** @var array<string, int> host => the lease holding its slot, until the response it belongs to is done */
     private array $heldSlots = [];
 
     /**
@@ -49,22 +55,67 @@ final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, 
 
     /**
      * @param array<string, mixed> $options
+     * @throws Throwable
      * @throws TransportExceptionInterface
      */
     public function request(string $method, string $url, array $options = []): ResponseInterface
     {
         $host = strtolower((string)parse_url($url, PHP_URL_HOST));
 
-        if ($host !== '' && ($options['extra'][self::SCHEDULED] ?? false) !== true) {
-            $this->awaitSlot($host);
+        if ($host === '' || ($options['extra'][self::SCHEDULED] ?? false) === true) {
+            return $this->client->request($method, $url, $options);
         }
 
-        return $this->client->request($method, $url, $options);
+        $lease = $this->awaitSlot($host);
+
+        try {
+            $response = $this->client->request($method, $url, $options);
+        } catch (Throwable $e) {
+            $this->giveBack($host, $lease);
+
+            throw $e;
+        }
+
+        return new ThrottledResponse($response, function () use ($host, $lease): void {
+            $this->giveBack($host, $lease);
+        });
     }
 
     public function stream(ResponseInterface|iterable $responses, ?float $timeout = null): ResponseStreamInterface
     {
-        return $this->client->stream($responses, $timeout);
+        if ($responses instanceof ResponseInterface) {
+            $responses = [$responses];
+        }
+
+        /** @var SplObjectStorage<ResponseInterface, ThrottledResponse> $throttled */
+        $throttled = new SplObjectStorage();
+        $inner = [];
+
+        foreach ($responses as $response) {
+            if ($response instanceof ThrottledResponse) {
+                $throttled[$response->response()] = $response;
+                $inner[] = $response->response();
+
+                continue;
+            }
+
+            $inner[] = $response;
+        }
+
+        return new ResponseStream($this->yieldChunks($inner, $throttled, $timeout));
+    }
+
+    /**
+     * @param list<ResponseInterface> $responses
+     * @param SplObjectStorage<ResponseInterface, ThrottledResponse> $throttled
+     *
+     * @return Generator<ResponseInterface, ChunkInterface>
+     */
+    private function yieldChunks(array $responses, SplObjectStorage $throttled, ?float $timeout): Generator
+    {
+        foreach ($this->client->stream($responses, $timeout) as $response => $chunk) {
+            yield ($throttled[$response] ?? $response) => $chunk;
+        }
     }
 
     /**
@@ -88,17 +139,24 @@ final class ThrottledHttpClient implements HttpClientInterface, ResetInterface, 
         $this->rateLimiter->reset();
     }
 
-    private function awaitSlot(string $host): void
+    private function awaitSlot(string $host): int
     {
-        if (isset($this->heldSlots[$host])) {
-            unset($this->heldSlots[$host]);
-            $this->rateLimiter->release($host);
-        }
+        $this->giveBack($host, $this->heldSlots[$host] ?? null);
 
         while (!$this->rateLimiter->tryAcquire($host)) {
             usleep(max(self::IDLE_WAIT_US, (int)round($this->rateLimiter->waitTimeFor($host) * 1_000_000)));
         }
 
-        $this->heldSlots[$host] = true;
+        return $this->heldSlots[$host] = ++$this->leases;
+    }
+
+    private function giveBack(string $host, ?int $lease): void
+    {
+        if ($lease === null || ($this->heldSlots[$host] ?? null) !== $lease) {
+            return;
+        }
+
+        unset($this->heldSlots[$host]);
+        $this->rateLimiter->release($host);
     }
 }
