@@ -99,7 +99,15 @@ final class SiteCrawler
                 continue;
             }
 
-            if ($read && $options->maxPages > 0 && $state->pagesDispatched >= $options->maxPages) {
+            $booked = count($state->pages) + $state->readsInFlight;
+
+            if ($read && $options->maxPages > 0 && $booked >= $options->maxPages) {
+                if (count($state->pages) < $options->maxPages) {
+                    $waiting[] = $item;
+
+                    continue;
+                }
+
                 $state->truncated = true;
 
                 if (!$options->checkLinkTargets) {
@@ -130,10 +138,6 @@ final class SiteCrawler
         $state->visited[$key] = true;
         $state->urlsChecked++;
 
-        if ($read) {
-            $state->pagesDispatched++;
-        }
-
         $pending = $this->pageFetcher->start($url, $depth, $read, paced: true);
 
         if ($pending === null) {
@@ -142,6 +146,10 @@ final class SiteCrawler
             $state->unreachable[$key] = $url;
 
             return;
+        }
+
+        if ($read) {
+            $state->readsInFlight++;
         }
 
         $state->inFlight[spl_object_id($pending->response)] = [
@@ -191,6 +199,10 @@ final class SiteCrawler
     private function accept(CrawlState $state, CrawlOptions $options, array $entry, ?PageResponse $answer): void
     {
         $key = $entry['key'];
+
+        if ($entry['read']) {
+            $state->readsInFlight--;
+        }
 
         if ($answer === null) {
             unset($state->bodySkipped[$key]);

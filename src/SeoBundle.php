@@ -158,7 +158,7 @@ final class SeoBundle extends AbstractBundle
             ->defaultValue(500)
             ->min(0)
             ->info(
-                'Maximum number of pages the crawl may ask to read per audit; it stops there and the report is marked as truncated. The limit is applied when a page is requested, not when it is read, so that the audit does not depend on which answers come back first: a URL that turns out to be a redirect or a file counts against it all the same. Set to 0 for no limit.'
+                'Maximum number of pages read per audit; the crawl stops there and the report is marked as truncated. Only pages actually read count: a URL that answers a redirect, a file, or nothing at all gives its place back. Set to 0 for no limit.'
             )
             ->end();
 

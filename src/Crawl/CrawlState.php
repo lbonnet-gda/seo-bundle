@@ -51,7 +51,7 @@ final class CrawlState
     public bool $truncated = false;
     public bool $stopped = false;
     public int $dispatched = 0;
-    public int $pagesDispatched = 0;
+    public int $readsInFlight = 0;
     public string $siteUrl;
     public ?string $siteHost;
 
