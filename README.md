@@ -66,6 +66,7 @@ check. The audit also runs as a Messenger message, on a schedule, or behind your
 - [Configuration](docs/configuration.md) — every option, with its default
 - [Usage](docs/usage.md) — console command, Messenger, Scheduler, and notifications
 - [Reports](docs/reports.md) — the JSON written after each audit
+- [Changelog](CHANGELOG.md) — what changed in each release, and what it means for an existing installation
 
 ## Known trade-offs
 
