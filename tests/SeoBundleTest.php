@@ -39,7 +39,7 @@ final class SeoBundleTest extends TestCase
             'seo.base_url' => null,
             'seo.fail_on' => 'error',
             'seo.disabled_checks' => [],
-            'seo.crawl.max_depth' => 3,
+            'seo.crawl.max_depth' => 10,
             'seo.crawl.max_pages' => 500,
             'seo.crawl.concurrency' => 4,
             'seo.crawl.timeout' => 10,

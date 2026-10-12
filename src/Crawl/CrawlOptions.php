@@ -16,7 +16,7 @@ final class CrawlOptions
      * @param (Closure(string $currentUrl, int $pagesRead): void)|null $progressCallback called after each page read
      */
     public function __construct(
-        public readonly int $maxDepth = 3,
+        public readonly int $maxDepth = 10,
         public readonly int $maxPages = 500,
         public readonly int $concurrency = 1,
         public readonly array $excludePatterns = [],

@@ -44,6 +44,9 @@ final class CrawlState
     /** @var array<string, string> dedup key => internal URL robots.txt keeps us from reading */
     public array $disallowed = [];
 
+    /** @var array<string, string> dedup key => internal URL linked from a page at the depth limit */
+    public array $beyondMaxDepth = [];
+
     /** @var array<int, CrawledPage> dispatch order => page */
     public array $pages = [];
 

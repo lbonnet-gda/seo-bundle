@@ -21,6 +21,7 @@ final class SeoReport
         public readonly bool $blockedByRobotsTxt = false,
         public readonly ?int $startUrlStatusCode = null,
         public readonly int $urlsDisallowedByRobotsTxt = 0,
+        public readonly int $urlsBeyondMaxDepth = 0,
     ) {
     }
 
