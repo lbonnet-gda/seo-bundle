@@ -27,6 +27,7 @@ final class CrawlResult
      * @param array<string, RedirectChain> $redirectChains dedup key of the chain's start URL => chain
      * @param array<string, string> $unreachable dedup key => internal URL that could not be requested at all
      * @param array<string, string> $disallowed dedup key => internal URL robots.txt disallows for our user agent
+     * @param array<string, string> $beyondMaxDepth dedup key => internal URL linked from a page at the depth limit
      * @param int $urlsChecked how many URLs the crawl requested, redirect hops included
      */
     public function __construct(
@@ -37,6 +38,7 @@ final class CrawlResult
         private readonly array $redirectChains = [],
         private readonly array $unreachable = [],
         private readonly array $disallowed = [],
+        private readonly array $beyondMaxDepth = [],
         public readonly int $urlsChecked = 0,
         public readonly bool $truncated = false,
         public readonly bool $blockedByRobotsTxt = false,
@@ -83,6 +85,14 @@ final class CrawlResult
     public function disallowedUrls(): array
     {
         return array_values($this->disallowed);
+    }
+
+    /**
+     * @return list<string> the internal URLs the depth limit kept the crawl from reading, so they went unaudited
+     */
+    public function urlsBeyondMaxDepth(): array
+    {
+        return array_values(array_diff_key($this->beyondMaxDepth, $this->pagesByKey));
     }
 
     public function isUnreachable(string $url): bool

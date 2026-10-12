@@ -9,7 +9,7 @@ seo:
     disabled_checks: [ ] # issue types to leave out entirely, e.g. ['image_missing_alt']
 
     crawl:
-        max_depth: 3 # crawl depth from the start URL (0 = the start page only)
+        max_depth: 10 # crawl depth from the start URL (0 = the start page only); what is past it is reported
         max_pages: 500 # pages read per audit before stopping; the report is then marked as truncated (0 = no limit)
         concurrency: 4 # requests in flight at once, all hosts together; a host is still called one at a time
         timeout: 10 # per-request timeout (seconds)

@@ -264,6 +264,16 @@ final class CheckSeoCommand extends Command
             );
         }
 
+        if ($report->urlsBeyondMaxDepth > 0) {
+            $io->warning(
+                sprintf(
+                    '%d internal URL(s) were linked from pages at the max_depth limit, so their own content was '
+                    .'never audited. Raise it with --max-depth or "seo.crawl.max_depth".',
+                    $report->urlsBeyondMaxDepth
+                )
+            );
+        }
+
         if ($report->truncated) {
             $io->warning(
                 sprintf(

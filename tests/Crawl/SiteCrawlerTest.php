@@ -116,6 +116,68 @@ final class SiteCrawlerTest extends TestCase
         $this->assertNotContains('https://example.com/two', $this->requestedUrls);
     }
 
+    public function testReportsTheUrlsTheDepthLimitLeavesOut(): void
+    {
+        $site = [
+            'https://example.com/' => self::page('<a href="/one">1</a>'),
+            'https://example.com/one' => self::page('<a href="/two">2</a><a href="/three">3</a>'),
+        ];
+
+        $crawl = $this->crawl($site, new CrawlOptions(maxDepth: 1));
+
+        $this->assertSame(['https://example.com/', 'https://example.com/one'], self::urls($crawl));
+        $this->assertSame(
+            ['https://example.com/two', 'https://example.com/three'],
+            $crawl->urlsBeyondMaxDepth(),
+        );
+    }
+
+    public function testStillReportsThemWhenTheirStatusWasChecked(): void
+    {
+        $site = [
+            'https://example.com/' => self::page('<a href="/one">1</a>'),
+            'https://example.com/one' => self::page('<a href="/two">2</a>'),
+            'https://example.com/two' => self::page(),
+        ];
+
+        // Knowing a URL answers 200 is not auditing it: its title, its canonical and the rest were never read.
+        $crawl = $this->crawl($site, new CrawlOptions(maxDepth: 1, checkLinkTargets: true));
+
+        $this->assertSame(Response::HTTP_OK, $crawl->responseFor('https://example.com/two')?->statusCode);
+        $this->assertSame(['https://example.com/two'], $crawl->urlsBeyondMaxDepth());
+    }
+
+    public function testAPageReachedBySomeOtherRouteIsNotCountedAsLeftOut(): void
+    {
+        $site = [
+            'https://example.com/' => self::page('<a href="/one">1</a><a href="/two">2</a>'),
+            'https://example.com/one' => self::page('<a href="/two">2</a>'),
+            'https://example.com/two' => self::page(),
+        ];
+
+        $crawl = $this->crawl($site, new CrawlOptions(maxDepth: 1));
+
+        $this->assertContains('https://example.com/two', self::urls($crawl));
+        $this->assertSame([], $crawl->urlsBeyondMaxDepth());
+    }
+
+    public function testWhatRobotsTxtKeepsOutIsNotCountedTwice(): void
+    {
+        $robotsTxtChecker = $this->createMock(RobotsTxtCheckerInterface::class);
+        $robotsTxtChecker->method('isAllowed')->willReturnCallback(
+            static fn(string $url): bool => !str_contains($url, '/two'),
+        );
+        $site = [
+            'https://example.com/' => self::page('<a href="/one">1</a>'),
+            'https://example.com/one' => self::page('<a href="/two">2</a>'),
+        ];
+
+        $crawl = $this->crawl($site, new CrawlOptions(maxDepth: 1), $robotsTxtChecker);
+
+        $this->assertSame(['https://example.com/two'], $crawl->disallowedUrls());
+        $this->assertSame([], $crawl->urlsBeyondMaxDepth());
+    }
+
     public function testChecksTheLinkTargetsOfTheLastPagesReadWithoutReadingThem(): void
     {
         $site = [

@@ -146,6 +146,17 @@ final class CheckSeoCommandTest extends TestCase
         $this->assertStringContainsString('respect_robots_txt', $display);
     }
 
+    public function testItWarnsAboutTheUrlsTheDepthLimitLeavesOut(): void
+    {
+        $tester = $this->tester(new SeoReport('https://example.com', pagesRead: 1, urlsBeyondMaxDepth: 7));
+
+        $this->assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('7 internal URL(s) were linked from pages at the max_depth', $display);
+        $this->assertStringContainsString('--max-depth', $display);
+    }
+
     public function testItWarnsAboutAnIncompleteCrawl(): void
     {
         $tester = $this->tester(

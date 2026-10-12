@@ -20,6 +20,7 @@ and past `storage.max_reports` files for that URL the oldest are deleted.
     "blockedByRobotsTxt": false,
     "startUrlStatusCode": null,
     "urlsDisallowedByRobotsTxt": 0,
+    "urlsBeyondMaxDepth": 0,
     "issuesCount": 6,
     "issuesBySeverity": {
         "error": 2,
@@ -69,6 +70,11 @@ Like Google, the crawl then goes no further than the start page. It is always fa
 `urlsDisallowedByRobotsTxt` counts the internal URLs the crawl left out because `robots.txt` disallows them for
 the configured user agent. They are audited by nobody, so the console command says so rather than letting the report
 look complete.
+
+`urlsBeyondMaxDepth` counts the internal URLs linked from pages sitting at `crawl.max_depth`, whose own content
+was therefore never read. When the `links` module runs, their status was still checked — a broken link among them
+is reported — but nothing else about them was: their title, their canonical, their directives were never looked at.
+A URL reached by some shallower route as well is not counted, since it was read after all.
 
 `pagesRead` counts the HTML pages parsed; `urlsChecked` counts what the crawl itself requested, redirect hops
 included. The extra requests the modules make afterward — external links, sitemaps, URL variants, canonical and

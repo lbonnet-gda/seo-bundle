@@ -149,9 +149,11 @@ final class SeoBundle extends AbstractBundle
     private static function configureCrawl(NodeBuilder $crawl): void
     {
         $crawl->integerNode('max_depth')
-            ->defaultValue(3)
+            ->defaultValue(10)
             ->min(0)
-            ->info('Maximum crawl depth from the starting URL (0 = the starting page only).')
+            ->info(
+                'Maximum crawl depth from the starting URL (0 = the starting page only). Pages linked past it are reported as left out, and "max_pages" is what keeps a crawl from running away.'
+            )
             ->end();
 
         $crawl->integerNode('max_pages')

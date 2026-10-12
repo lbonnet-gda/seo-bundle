@@ -70,6 +70,7 @@ final class SiteCrawler
             redirectChains: $state->chains,
             unreachable: $state->unreachable,
             disallowed: $state->disallowed,
+            beyondMaxDepth: $state->beyondMaxDepth,
             urlsChecked: $state->urlsChecked,
             truncated: $state->truncated,
             blockedByRobotsTxt: $this->robotsTxtChecker?->isSiteBlocked($state->siteUrl) === true,
@@ -251,10 +252,6 @@ final class SiteCrawler
     {
         $readLinks = $depth < $options->maxDepth;
 
-        if (!$readLinks && !$options->checkLinkTargets) {
-            return;
-        }
-
         foreach ($links as $link) {
             $linkKey = UrlResolver::dedupKey($link->url);
             $alreadyRequested = isset($state->visited[$linkKey]);
@@ -268,6 +265,14 @@ final class SiteCrawler
                 $state->disallowed[$linkKey] = $link->url;
 
                 continue;
+            }
+
+            if (!$readLinks) {
+                $state->beyondMaxDepth[$linkKey] = $link->url;
+
+                if (!$options->checkLinkTargets) {
+                    continue;
+                }
             }
 
             $state->queue[] = ['url' => $link->url, 'depth' => $depth + 1, 'read' => $readLinks, 'force' => false];

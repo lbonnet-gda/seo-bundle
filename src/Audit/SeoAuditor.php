@@ -42,7 +42,7 @@ final class SeoAuditor implements SeoAuditorInterface
         iterable $modules = [],
         private readonly ?RobotsTxtCheckerInterface $robotsTxtChecker = null,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
-        private readonly int $defaultMaxDepth = 3,
+        private readonly int $defaultMaxDepth = 10,
         private readonly int $defaultMaxPages = 500,
         private readonly int $defaultConcurrency = 1,
         private readonly array $defaultExcludePatterns = [],
@@ -120,6 +120,7 @@ final class SeoAuditor implements SeoAuditorInterface
             blockedByRobotsTxt: $crawl->blockedByRobotsTxt,
             startUrlStatusCode: self::startUrlStatusCode($crawl),
             urlsDisallowedByRobotsTxt: count($crawl->disallowedUrls()),
+            urlsBeyondMaxDepth: count($crawl->urlsBeyondMaxDepth()),
         );
 
         try {
