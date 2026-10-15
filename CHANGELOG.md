@@ -3,6 +3,27 @@
 Notable changes to `lbonnet/seo-bundle`, newest first. Versions follow [semantic versioning](https://semver.org/),
 with the usual issue for a 0.x package: a minor release may change behavior or break compatibility, and says so.
 
+## [0.4.0] - 2026-10-15
+
+### Added
+
+- **Stored reports can be read back.** `ReportReaderInterface` — `latest()` and `history()` — is kept apart from
+  `ReportStorageInterface`, so a storage that only writes stays a valid storage. A report that names a check which
+  no longer exists, or that misses a field a later version added, is still read; a file that cannot be read at all
+  is skipped instead of hiding the reports behind it.
+- **Every audit says what has changed since the previous one** on the same site: the issues that appeared, those that
+  were fixed, and how many stayed. The console prints it after the issue table, and `SeoAuditCompletedEvent`
+  carries it as `$event->changes`, so a listener can report the three new broken links instead of the same 161
+  issues every morning. The previous report is read before the crawl starts, since by the end of an audit the
+  report it would compare itself against is its own.
+- Two issues are the same issue when they sit on the same page and share their type and their context, `statusCode`,
+  `anchorText` and `timeout` excluded: a link that answered 404 and now times out has not been fixed and found
+  again, and rewording a check's message does not report every issue on the site as new. Issues found on a page the
+  new audit did not read are counted on their own — a page missing from a crawl is not a page that was fixed.
+
+> On a 152-page site, the six reports already stored compare pairwise without a single false positive, 161 issues
+> each time; the page that appeared between two and them carries no issue, and says nothing.
+
 ## [0.3.0] - 2026-10-12
 
 ### Added
@@ -71,6 +92,7 @@ site **once** and audits it on three fronts — 60 checks across the `links`, `o
 of which can be turned off. Runs as a console command, a Messenger message, or behind an event listener, and writes
 a JSON report per audit.
 
+[0.4.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.1.1...v0.2.0
