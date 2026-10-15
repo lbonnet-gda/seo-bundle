@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle\Tests;
 
+use Lbonnet\SeoBundle\Audit\ReportComparer;
 use Lbonnet\SeoBundle\Audit\SeoAuditor;
 use Lbonnet\SeoBundle\Audit\SeoAuditorInterface;
 use Lbonnet\SeoBundle\Command\CheckSeoCommand;
@@ -125,6 +126,7 @@ final class SeoBundleTest extends TestCase
         foreach (
             [
                 SeoAuditor::class,
+                ReportComparer::class,
                 SiteCrawler::class,
                 CheckSeoCommand::class,
                 CheckSeoMessageHandler::class,
