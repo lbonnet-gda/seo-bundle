@@ -19,6 +19,7 @@ use Lbonnet\SeoBundle\Robots\RobotsTxtCheckerInterface;
 use Lbonnet\SeoBundle\Robots\RobotsTxtProviderInterface;
 use Lbonnet\SeoBundle\SeoBundle;
 use Lbonnet\SeoBundle\Storage\JsonFileReportStorage;
+use Lbonnet\SeoBundle\Storage\ReportReaderInterface;
 use Lbonnet\SeoBundle\Storage\ReportStorageInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -137,6 +138,7 @@ final class SeoBundleTest extends TestCase
 
         foreach (
             [
+                ReportReaderInterface::class,
                 ReportStorageInterface::class,
                 RobotsTxtCheckerInterface::class,
                 RobotsTxtProviderInterface::class,
@@ -215,6 +217,7 @@ final class SeoBundleTest extends TestCase
 
         $this->assertFalse($container->hasDefinition(JsonFileReportStorage::class));
         $this->assertFalse($container->hasAlias(ReportStorageInterface::class));
+        $this->assertFalse($container->hasAlias(ReportReaderInterface::class));
     }
 
     /**
