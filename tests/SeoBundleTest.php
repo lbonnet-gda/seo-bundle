@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle\Tests;
 
+use Lbonnet\SeoBundle\Audit\ReportComparer;
 use Lbonnet\SeoBundle\Audit\SeoAuditor;
 use Lbonnet\SeoBundle\Audit\SeoAuditorInterface;
 use Lbonnet\SeoBundle\Command\CheckSeoCommand;
@@ -19,6 +20,7 @@ use Lbonnet\SeoBundle\Robots\RobotsTxtCheckerInterface;
 use Lbonnet\SeoBundle\Robots\RobotsTxtProviderInterface;
 use Lbonnet\SeoBundle\SeoBundle;
 use Lbonnet\SeoBundle\Storage\JsonFileReportStorage;
+use Lbonnet\SeoBundle\Storage\ReportReaderInterface;
 use Lbonnet\SeoBundle\Storage\ReportStorageInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -124,6 +126,7 @@ final class SeoBundleTest extends TestCase
         foreach (
             [
                 SeoAuditor::class,
+                ReportComparer::class,
                 SiteCrawler::class,
                 CheckSeoCommand::class,
                 CheckSeoMessageHandler::class,
@@ -137,6 +140,7 @@ final class SeoBundleTest extends TestCase
 
         foreach (
             [
+                ReportReaderInterface::class,
                 ReportStorageInterface::class,
                 RobotsTxtCheckerInterface::class,
                 RobotsTxtProviderInterface::class,
@@ -170,6 +174,30 @@ final class SeoBundleTest extends TestCase
         $httpClient = $auditor->getArgument(1);
         $httpClient = $httpClient instanceof Definition ? $httpClient : $container->findDefinition((string)$httpClient);
         $this->assertSame(ThrottledHttpClient::class, $httpClient->getClass());
+    }
+
+    public function testTheCommandIsWiredToTheStoredReports(): void
+    {
+        $container = $this->load([]);
+        $container->register(HttpClientInterface::class)->setSynthetic(true)->setPublic(true);
+        $container->getDefinition(CheckSeoCommand::class)->setPublic(true);
+
+        $container->compile();
+
+        $reader = $container->findDefinition(CheckSeoCommand::class)->getArgument(3);
+        $reader = $reader instanceof Definition ? $reader : $container->findDefinition((string)$reader);
+        $this->assertSame(JsonFileReportStorage::class, $reader->getClass());
+    }
+
+    public function testTheContainerStillCompilesWithoutReportStorage(): void
+    {
+        $container = $this->load(['seo' => ['storage' => ['dir' => null]]]);
+        $container->register(HttpClientInterface::class)->setSynthetic(true)->setPublic(true);
+
+        // Nothing stores reports, so nothing reads them back: the optional argument simply stays empty.
+        $container->compile();
+
+        $this->assertFalse($container->hasDefinition(JsonFileReportStorage::class));
     }
 
     public function testADisabledModuleIsNotRegistered(): void
@@ -215,6 +243,7 @@ final class SeoBundleTest extends TestCase
 
         $this->assertFalse($container->hasDefinition(JsonFileReportStorage::class));
         $this->assertFalse($container->hasAlias(ReportStorageInterface::class));
+        $this->assertFalse($container->hasAlias(ReportReaderInterface::class));
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle\Tests\Command;
 
+use DateTimeImmutable;
 use Lbonnet\SeoBundle\Audit\SeoAuditorInterface;
 use Lbonnet\SeoBundle\Command\CheckSeoCommand;
 use Lbonnet\SeoBundle\Model\Issue;
@@ -11,6 +12,8 @@ use Lbonnet\SeoBundle\Model\IssueType;
 use Lbonnet\SeoBundle\Model\Module;
 use Lbonnet\SeoBundle\Model\PageReport;
 use Lbonnet\SeoBundle\Model\SeoReport;
+use Lbonnet\SeoBundle\Storage\ReportReaderInterface;
+use Lbonnet\SeoBundle\Storage\StoredReport;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -170,6 +173,86 @@ final class CheckSeoCommandTest extends TestCase
         $this->assertStringContainsString('Stopped after 25 page(s)', $display);
     }
 
+    public function testItReportsWhatChangedSinceThePreviousAudit(): void
+    {
+        $tester = $this->tester(
+            $this->reportWith(IssueType::BrokenInternalLink),
+            previous: $this->reportWith(IssueType::MissingTitle),
+        );
+
+        $this->assertSame(Command::FAILURE, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('Changes since the previous audit (2026-01-01 08:00)', $display);
+        $this->assertStringContainsString('1 appeared, 1 fixed, 0 unchanged', $display);
+        $this->assertStringContainsString('broken_internal_link', $display);
+        $this->assertStringContainsString('missing_title', $display);
+    }
+
+    public function testItSaysWhenNothingChangedSinceThePreviousAudit(): void
+    {
+        $report = $this->reportWith(IssueType::BrokenInternalLink);
+        $tester = $this->tester($report, previous: $report);
+
+        $this->assertSame(Command::FAILURE, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('Nothing changed since the previous audit', $display);
+        $this->assertStringContainsString('the same 1 issue(s)', $display);
+    }
+
+    public function testAnIssueOnAPageThisAuditDidNotReadIsNotReportedAsFixed(): void
+    {
+        $report = $this->reportWith(IssueType::BrokenInternalLink);
+        $tester = $this->tester(
+            $report,
+            previous: new SeoReport(
+            startUrl: 'https://example.com',
+            pages: [
+                ...$report->pages,
+                new PageReport(
+                    'https://example.com/gone',
+                    Response::HTTP_OK,
+                    [new Issue(IssueType::MissingTitle, 'No title.')],
+                ),
+            ],
+        )
+        );
+
+        $this->assertSame(Command::FAILURE, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('Nothing changed since the previous audit', $display);
+        $this->assertStringContainsString('1 issue(s) sat on 1 page(s) this audit did not read', $display);
+        $this->assertStringNotContainsString('Changes since the previous audit', $display);
+    }
+
+    public function testItSaysNothingAboutChangesWithoutAPreviousAudit(): void
+    {
+        $tester = $this->tester($this->reportWith(IssueType::BrokenInternalLink));
+
+        $this->assertSame(Command::FAILURE, $tester->execute([]));
+        $this->assertStringNotContainsString('previous audit', $tester->getDisplay());
+    }
+
+    public function testTheChangesAreReportedEvenWhenTheAuditFoundNothing(): void
+    {
+        $tester = $this->tester(
+            new SeoReport(
+                startUrl: 'https://example.com',
+                pages: [new PageReport('https://example.com', Response::HTTP_OK)],
+                pagesRead: 1,
+            ),
+            previous: $this->reportWith(IssueType::BrokenInternalLink),
+        );
+
+        $this->assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('0 appeared, 1 fixed', $display);
+        $this->assertStringContainsString('All clear!', $display);
+    }
+
     private function reportWith(IssueType $type): SeoReport
     {
         return new SeoReport(
@@ -188,11 +271,30 @@ final class CheckSeoCommandTest extends TestCase
         return new CommandTester(new CheckSeoCommand($auditor, defaultBaseUrl: 'https://example.com'));
     }
 
-    private function tester(SeoReport $report): CommandTester
+    private function tester(SeoReport $report, ?SeoReport $previous = null): CommandTester
     {
         $auditor = $this->createMock(SeoAuditorInterface::class);
         $auditor->method('audit')->willReturn($report);
 
-        return new CommandTester(new CheckSeoCommand($auditor, defaultBaseUrl: 'https://example.com'));
+        $reader = null;
+
+        if ($previous !== null) {
+            $reader = $this->createMock(ReportReaderInterface::class);
+            $reader->method('latest')->willReturn(
+                new StoredReport(
+                    $previous,
+                    new DateTimeImmutable('2026-01-01 08:00:00'),
+                    '/var/seo/report-2026-01-01.json',
+                )
+            );
+        }
+
+        return new CommandTester(
+            new CheckSeoCommand(
+                $auditor,
+                defaultBaseUrl: 'https://example.com',
+                reportReader: $reader,
+            )
+        );
     }
 }

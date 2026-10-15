@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle\Tests\Audit;
 
+use DateTimeImmutable;
 use Lbonnet\SeoBundle\Audit\SeoAuditor;
 use Lbonnet\SeoBundle\Crawl\SiteCrawler;
 use Lbonnet\SeoBundle\Event\SeoAuditCompletedEvent;
@@ -16,6 +17,8 @@ use Lbonnet\SeoBundle\Model\PageReport;
 use Lbonnet\SeoBundle\Model\SeoReport;
 use Lbonnet\SeoBundle\Module\ModuleInterface;
 use Lbonnet\SeoBundle\Robots\RobotsTxtChecker;
+use Lbonnet\SeoBundle\Storage\ReportReaderInterface;
+use Lbonnet\SeoBundle\Storage\StoredReport;
 use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
@@ -190,6 +193,59 @@ final class SeoAuditorTest extends TestCase
         $this->assertSame('https://example.com/', $report->startUrl);
     }
 
+    public function testTheCompletedEventCarriesWhatChangedSinceThePreviousAudit(): void
+    {
+        $previous = new StoredReport(
+            new SeoReport(
+                startUrl: 'https://example.com/',
+                pages: [
+                    new PageReport(
+                        'https://example.com/',
+                        Response::HTTP_OK,
+                        [new Issue(IssueType::MissingTitle, 'The page has no <title>.')],
+                    ),
+                ],
+            ),
+            new DateTimeImmutable('2026-01-01 08:00:00'),
+            '/var/seo/report-2026-01-01.json',
+        );
+
+        $reader = $this->createMock(ReportReaderInterface::class);
+        $reader->expects($this->once())->method('latest')->with('https://example.com/')->willReturn($previous);
+
+        $event = null;
+        $dispatcher = $this->createMock(EventDispatcherInterface::class);
+        $dispatcher->method('dispatch')->willReturnCallback(static function (object $dispatched) use (&$event) {
+            $event = $dispatched;
+
+            return $dispatched;
+        });
+
+        $this->auditor([], dispatcher: $dispatcher, reportReader: $reader)->audit('https://example.com/');
+
+        $this->assertInstanceOf(SeoAuditCompletedEvent::class, $event);
+        $this->assertNotNull($event->changes);
+        $this->assertSame(1, $event->changes->countFixed());
+        $this->assertSame(0, $event->changes->countAppeared());
+        $this->assertSame('2026-01-01', $event->changes->previousAuditAt->format('Y-m-d'));
+    }
+
+    public function testTheCompletedEventCarriesNoChangesWhenNothingIsStored(): void
+    {
+        $event = null;
+        $dispatcher = $this->createMock(EventDispatcherInterface::class);
+        $dispatcher->method('dispatch')->willReturnCallback(static function (object $dispatched) use (&$event) {
+            $event = $dispatched;
+
+            return $dispatched;
+        });
+
+        $this->auditor([], dispatcher: $dispatcher)->audit('https://example.com/');
+
+        $this->assertInstanceOf(SeoAuditCompletedEvent::class, $event);
+        $this->assertNull($event->changes);
+    }
+
     /**
      * @param list<ModuleInterface> $modules
      * @param list<string> $defaultExcludePatterns
@@ -203,6 +259,7 @@ final class SeoAuditorTest extends TestCase
         ?EventDispatcherInterface $dispatcher = null,
         ?LoggerInterface $logger = null,
         bool $robotsTxtChecker = false,
+        ?ReportReaderInterface $reportReader = null,
     ): SeoAuditor {
         $httpClient = new MockHttpClient(function (string $method, string $url): MockResponse {
             $this->requestedUrls[] = $url;
@@ -246,6 +303,7 @@ final class SeoAuditorTest extends TestCase
             defaultExcludePatterns: $defaultExcludePatterns,
             disabledChecks: $disabledChecks,
             logger: $logger ?? $this->createMock(LoggerInterface::class),
+            reportReader: $reportReader,
         );
     }
 

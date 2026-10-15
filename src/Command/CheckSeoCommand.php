@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace Lbonnet\SeoBundle\Command;
 
+use Lbonnet\SeoBundle\Audit\ReportComparer;
 use Lbonnet\SeoBundle\Audit\SeoAuditorInterface;
+use Lbonnet\SeoBundle\Model\IssueChange;
 use Lbonnet\SeoBundle\Model\Module;
+use Lbonnet\SeoBundle\Model\ReportComparison;
 use Lbonnet\SeoBundle\Model\SeoReport;
 use Lbonnet\SeoBundle\Model\Severity;
+use Lbonnet\SeoBundle\Storage\ReportReaderInterface;
 use Lbonnet\SeoBundle\Url\UrlPattern;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\LockableTrait;
 use Symfony\Component\Console\Helper\ProgressBar;
+use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -28,10 +33,14 @@ final class CheckSeoCommand extends Command
 {
     use LockableTrait;
 
+    private const MAX_CHANGES_LISTED = 15;
+
     public function __construct(
         private readonly SeoAuditorInterface $auditor,
         private readonly ?string $defaultBaseUrl = null,
         private readonly string $defaultFailOn = 'error',
+        private readonly ?ReportReaderInterface $reportReader = null,
+        private readonly ReportComparer $reportComparer = new ReportComparer(),
     ) {
         parent::__construct();
     }
@@ -167,6 +176,8 @@ final class CheckSeoCommand extends Command
                 }
             };
 
+            $previousAudit = $this->reportReader?->latest($startUrl);
+
             $report = $this->auditor->audit(
                 startUrl: $startUrl,
                 maxDepth: $maxDepthOption !== null ? (int)$maxDepthOption : null,
@@ -200,7 +211,11 @@ final class CheckSeoCommand extends Command
 
             self::renderCrawlWarnings($io, $report);
 
+            $changes = $previousAudit !== null ? $this->reportComparer->compare($report, $previousAudit) : null;
+
             if (!$report->hasIssues()) {
+                self::renderChanges($io, $changes);
+
                 $io->success(
                     sprintf(
                         'All clear! Read %d page(s) and checked %d URL(s) in %.2fs with 0 issues.',
@@ -214,6 +229,7 @@ final class CheckSeoCommand extends Command
             }
 
             self::renderIssuesReport($io, $report);
+            self::renderChanges($io, $changes);
 
             if (!$report->hasIssues($failOn)) {
                 $io->success(
@@ -328,6 +344,104 @@ final class CheckSeoCommand extends Command
 
         $table->render();
         $io->newLine();
+    }
+
+    private static function renderChanges(SymfonyStyle $io, ?ReportComparison $changes): void
+    {
+        if ($changes === null) {
+            return;
+        }
+
+        $since = $changes->previousAuditAt->format('Y-m-d H:i');
+
+        if ($changes->hasChanges()) {
+            $io->section(
+                sprintf(
+                    'Changes since the previous audit (%s): %d appeared, %d fixed, %d unchanged',
+                    $since,
+                    $changes->countAppeared(),
+                    $changes->countFixed(),
+                    $changes->stayed,
+                )
+            );
+
+            self::renderChangesTable($io, $changes);
+        } elseif ($changes->stayed > 0) {
+            $io->text(
+                sprintf(
+                    'Nothing changed since the previous audit (%s): the same %d issue(s).',
+                    $since,
+                    $changes->stayed,
+                )
+            );
+        } elseif ($changes->countPreviously() === 0) {
+            $io->text(sprintf('Nothing new since the previous audit (%s), which found no issue either.', $since));
+        } else {
+            $io->text(sprintf('Nothing new since the previous audit (%s).', $since));
+        }
+
+        if ($changes->issuesNoLongerAudited > 0) {
+            $io->text(
+                sprintf(
+                    '%d issue(s) sat on %d page(s) this audit did not read: they count as neither fixed nor found.',
+                    $changes->issuesNoLongerAudited,
+                    $changes->pagesNoLongerAudited,
+                )
+            );
+        }
+
+        $io->newLine();
+    }
+
+    private static function renderChangesTable(SymfonyStyle $io, ReportComparison $changes): void
+    {
+        $table = $io->createTable();
+        $table->setHeaders(['', 'Severity', 'Issue', 'Page']);
+        $table->setStyle('box');
+
+        $pageWidth = max(30, (new Terminal())->getWidth() - 54);
+        $table->setColumnMaxWidth(3, $pageWidth);
+
+        self::addChangeRows($table, $changes->appeared, '+', 'red', $pageWidth);
+        self::addChangeRows($table, $changes->fixed, '-', 'green', $pageWidth);
+
+        $table->render();
+        $io->newLine();
+    }
+
+    /**
+     * @param list<IssueChange> $changes
+     */
+    private static function addChangeRows(
+        Table $table,
+        array $changes,
+        string $sign,
+        string $color,
+        int $pageWidth,
+    ): void {
+        foreach (array_slice($changes, 0, self::MAX_CHANGES_LISTED) as $change) {
+            $table->addRow([
+                sprintf('<fg=%s>%s</>', $color, $sign),
+                self::formatSeverity($change->issue->severity()),
+                sprintf(
+                    '<fg=yellow>%s</>%s',
+                    $change->issue->type->value,
+                    $change->count > 1 ? sprintf(' x%d', $change->count) : '',
+                ),
+                sprintf('<href=%s>%s</>', $change->pageUrl, self::truncate($change->pageUrl, $pageWidth)),
+            ]);
+        }
+
+        $hidden = count($changes) - self::MAX_CHANGES_LISTED;
+
+        if ($hidden > 0) {
+            $table->addRow([
+                sprintf('<fg=%s>%s</>', $color, $sign),
+                '',
+                '',
+                sprintf('... and %d more in the report', $hidden),
+            ]);
+        }
     }
 
     private static function formatSeverity(Severity $severity): string

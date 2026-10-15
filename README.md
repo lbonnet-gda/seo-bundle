@@ -58,7 +58,8 @@ php bin/console seo:check
 ```
 
 The command prints every issue it finds and exits with `1` when one of them is an `error`, so it doubles as a CI
-check. The audit also runs as a Messenger message, on a schedule, or behind your own event listener.
+check. From the second audit of a site onward, it also says what appeared and what was fixed since the previous one.
+The audit runs as a console command, a Messenger message, on a schedule, or behind your own event listener.
 
 ## Documentation
 

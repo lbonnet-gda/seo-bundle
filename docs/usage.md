@@ -134,4 +134,47 @@ final class SeoNotificationListener
 
 The event carries the whole report, so any other use — a CSV export, a POST to an internal API, a daily digest — is a
 listener of this shape. To replace the stored JSON rather than add to it, implement `ReportStorageInterface` and point
-the interface alias at your own service.
+the interface alias at your own service; implement `ReportReaderInterface` as well and audits keep comparing
+themselves with what you stored.
+
+### 5. Alerting on What Changed, Not on What Is Wrong
+
+A site audited every morning finds mostly the same issues it found yesterday. `$event->changes` is what the event
+has that the report alone has not: the audit compared itself with the previous stored report of that site, so the
+listener above can report what appeared instead of repeating the whole list.
+
+```php
+use Lbonnet\SeoBundle\Event\SeoAuditCompletedEvent;
+use Lbonnet\SeoBundle\Model\IssueChange;
+
+public function __invoke(SeoAuditCompletedEvent $event): void
+{
+    $changes = $event->changes;
+
+    // null on the first audit of a site, or when storage.dir is disabled.
+    if ($changes === null || $changes->appeared === []) {
+        return;
+    }
+
+    $message = sprintf(
+        "%d new issue(s) on %s since %s (%d fixed):\n%s",
+        $changes->countAppeared(),
+        $event->report->startUrl,
+        $changes->previousAuditAt->format('Y-m-d H:i'),
+        $changes->countFixed(),
+        implode("\n", array_map(
+            static fn(IssueChange $change): string => sprintf(
+                '%s on %s',
+                $change->issue->type->value,
+                $change->pageUrl,
+            ),
+            $changes->appeared,
+        )),
+    );
+
+    $this->notifier->send(new Notification($message, ['chat/slack']));
+}
+```
+
+What counts as the same issue from one audit to the next, and why a page not audited again is not a page that was fixed,
+is in [Reports](reports.md#what-changed-since-the-previous-audit).

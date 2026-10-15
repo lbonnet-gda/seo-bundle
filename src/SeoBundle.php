@@ -13,6 +13,7 @@ use Lbonnet\SeoBundle\Module\ModuleInterface;
 use Lbonnet\SeoBundle\Module\OnPage\OnPageModule;
 use Lbonnet\SeoBundle\Module\Technical\TechnicalModule;
 use Lbonnet\SeoBundle\Storage\JsonFileReportStorage;
+use Lbonnet\SeoBundle\Storage\ReportReaderInterface;
 use Lbonnet\SeoBundle\Storage\ReportStorageInterface;
 use Lbonnet\SeoBundle\Url\UrlPattern;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
@@ -143,6 +144,7 @@ final class SeoBundle extends AbstractBundle
         if ($config['storage']['dir'] === null || $config['storage']['dir'] === '') {
             $builder->removeDefinition(JsonFileReportStorage::class);
             $builder->removeAlias(ReportStorageInterface::class);
+            $builder->removeAlias(ReportReaderInterface::class);
         }
     }
 
