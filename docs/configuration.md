@@ -52,3 +52,8 @@ answer is in — below the limit, two audits of the same site still read the sam
 `exclude_patterns` entries against the regex engine, so a typo fails fast instead of silently doing nothing. A
 pattern missing its delimiters — `'/admin'` instead of `'#/admin#'` — would otherwise exclude no URL at all. Patterns
 passed to the command or to `CheckSeoMessage` are checked the same way.
+
+`storage.max_reports` bounds how far back you can look, not whether an audit can compare itself with the previous
+one: the previous report is read before the new one is written, so even `max_reports: 1` still reports what changed
+between two consecutive audits. What the setting limits is the history kept for everything else — at the default 30,
+a daily audit keeps a month of reports to compare by hand, or to feed a dashboard. See [Reports](reports.md).
