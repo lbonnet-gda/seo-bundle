@@ -35,6 +35,11 @@ final class ReportComparison
         return self::total($this->fixed);
     }
 
+    public function countPreviously(): int
+    {
+        return $this->countFixed() + $this->stayed + $this->issuesNoLongerAudited;
+    }
+
     public function hasChanges(): bool
     {
         return $this->appeared !== [] || $this->fixed !== [];

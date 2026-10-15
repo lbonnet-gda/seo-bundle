@@ -176,6 +176,30 @@ final class SeoBundleTest extends TestCase
         $this->assertSame(ThrottledHttpClient::class, $httpClient->getClass());
     }
 
+    public function testTheCommandIsWiredToTheStoredReports(): void
+    {
+        $container = $this->load([]);
+        $container->register(HttpClientInterface::class)->setSynthetic(true)->setPublic(true);
+        $container->getDefinition(CheckSeoCommand::class)->setPublic(true);
+
+        $container->compile();
+
+        $reader = $container->findDefinition(CheckSeoCommand::class)->getArgument(3);
+        $reader = $reader instanceof Definition ? $reader : $container->findDefinition((string)$reader);
+        $this->assertSame(JsonFileReportStorage::class, $reader->getClass());
+    }
+
+    public function testTheContainerStillCompilesWithoutReportStorage(): void
+    {
+        $container = $this->load(['seo' => ['storage' => ['dir' => null]]]);
+        $container->register(HttpClientInterface::class)->setSynthetic(true)->setPublic(true);
+
+        // Nothing stores reports, so nothing reads them back: the optional argument simply stays empty.
+        $container->compile();
+
+        $this->assertFalse($container->hasDefinition(JsonFileReportStorage::class));
+    }
+
     public function testADisabledModuleIsNotRegistered(): void
     {
         $container = $this->load(['seo' => ['links' => false, 'technical' => false, 'on_page' => false]]);

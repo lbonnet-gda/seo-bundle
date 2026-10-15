@@ -16,6 +16,7 @@ use Lbonnet\SeoBundle\Model\SeoReport;
 use Lbonnet\SeoBundle\Module\ModuleInterface;
 use Lbonnet\SeoBundle\Module\ModuleOptions;
 use Lbonnet\SeoBundle\Robots\RobotsTxtCheckerInterface;
+use Lbonnet\SeoBundle\Storage\ReportReaderInterface;
 use Lbonnet\SeoBundle\Url\UrlResolver;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
@@ -49,6 +50,8 @@ final class SeoAuditor implements SeoAuditorInterface
         private readonly bool $defaultCheckExternal = true,
         array $disabledChecks = [],
         private readonly LoggerInterface $logger = new NullLogger(),
+        private readonly ?ReportReaderInterface $reportReader = null,
+        private readonly ReportComparer $reportComparer = new ReportComparer(),
     ) {
         $moduleList = [];
 
@@ -72,6 +75,7 @@ final class SeoAuditor implements SeoAuditorInterface
     ): SeoReport {
         $startTime = hrtime(true);
         $selectedModules = $this->selectModules($modules);
+        $previousAudit = $this->reportReader?->latest($startUrl);
 
         $options = new CrawlOptions(
             maxDepth: $maxDepth ?? $this->defaultMaxDepth,
@@ -123,8 +127,10 @@ final class SeoAuditor implements SeoAuditorInterface
             urlsBeyondMaxDepth: count($crawl->urlsBeyondMaxDepth()),
         );
 
+        $changes = $previousAudit !== null ? $this->reportComparer->compare($report, $previousAudit) : null;
+
         try {
-            $this->eventDispatcher?->dispatch(new SeoAuditCompletedEvent($report));
+            $this->eventDispatcher?->dispatch(new SeoAuditCompletedEvent($report, $changes));
         } catch (Throwable $e) {
             $this->logger->error(sprintf('[Seo] A "SeoAuditCompletedEvent" listener failed: %s', $e->getMessage()));
         }
