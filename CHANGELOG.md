@@ -3,6 +3,20 @@
 Notable changes to `lbonnet/seo-bundle`, newest first. Versions follow [semantic versioning](https://semver.org/),
 with the usual issue for a 0.x package: a minor release may change behavior or break compatibility, and says so.
 
+## [0.5.0] - 2026-10-16
+
+### Changed
+
+- **The console summarizes before it lists.** The output now opens with a count per check, the worst severity first,
+  with how many pages each one sits on: the whole audit in a dozen lines, however big the site. The table that
+  follows lists the issues at or above `--fail-on`, the ones that decide the exit code, and a line says how many
+  are counted but not listed. `-v` lists every one of them, as before.
+- What is displayed does not change what fails: `--fail-on` alone still decides the exit code.
+
+> On a 152-page site, 161 issues used to print 161 rows, nine of them errors buried in the middle of 113 notices.
+> The same report now opens with 11 summary lines and lists the 9 errors — and the summary says the 94
+> `hreflang_missing_x_default` sit on 94 distinct pages, which the old table could not answer.
+
 ## [0.4.0] - 2026-10-15
 
 ### Added
@@ -21,8 +35,9 @@ with the usual issue for a 0.x package: a minor release may change behavior or b
   again, and rewording a check's message does not report every issue on the site as new. Issues found on a page the
   new audit did not read are counted on their own — a page missing from a crawl is not a page that was fixed.
 
-> On a 152-page site, the six reports already stored compare pairwise without a single false positive, 161 issues
-> each time; the page that appeared between two and them carries no issue, and says nothing.
+> Two audits of a 152-page site, run back to back, report what they should: the second says *Nothing have changed since
+> the previous audit: the same 161 issue (s)* — not one false positive over 161 issues, through a real container, a
+> real crawl, and a real report read back from disk.
 
 ## [0.3.0] - 2026-10-12
 
@@ -92,6 +107,7 @@ site **once** and audits it on three fronts — 60 checks across the `links`, `o
 of which can be turned off. Runs as a console command, a Messenger message, or behind an event listener, and writes
 a JSON report per audit.
 
+[0.5.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.2.0...v0.2.1

@@ -16,6 +16,7 @@ use Lbonnet\SeoBundle\Storage\ReportReaderInterface;
 use Lbonnet\SeoBundle\Storage\StoredReport;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -173,6 +174,77 @@ final class CheckSeoCommandTest extends TestCase
         $this->assertStringContainsString('Stopped after 25 page(s)', $display);
     }
 
+    public function testTheSummaryCountsEveryCheckBeforeTheDetail(): void
+    {
+        $tester = $this->tester(
+            new SeoReport(
+                startUrl: 'https://example.com',
+                pages: [
+                    new PageReport('https://example.com', Response::HTTP_OK, [
+                        new Issue(IssueType::BrokenInternalLink, 'Broken.'),
+                        new Issue(IssueType::TitleTooLong, 'Long.'),
+                    ]),
+                    new PageReport('https://example.com/a', Response::HTTP_OK, [
+                        new Issue(IssueType::TitleTooLong, 'Long.'),
+                    ]),
+                ],
+                pagesRead: 2,
+            )
+        );
+
+        $this->assertSame(Command::FAILURE, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('Count', $display);
+        $this->assertStringContainsString('Pages', $display);
+        $this->assertMatchesRegularExpression('/broken_internal_link\D+1\D+1/', $display);
+        $this->assertMatchesRegularExpression('/title_too_long\D+2\D+2/', $display);
+        $this->assertLessThan(
+            strpos($display, 'Broken.'),
+            (int)strpos($display, 'broken_internal_link'),
+            'the summary should come before the detail',
+        );
+    }
+
+    public function testAnIssueBelowTheThresholdIsCountedButNotListed(): void
+    {
+        $tester = $this->tester($this->reportWith(IssueType::TitleTooLong));
+
+        $this->assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('title_too_long', $display);
+        $this->assertStringNotContainsString('Something to fix.', $display);
+        $this->assertStringContainsString('1 issue(s) below "error" are counted above but not listed', $display);
+    }
+
+    public function testVerboseListsEveryIssueWhateverItsSeverity(): void
+    {
+        $tester = $this->tester($this->reportWith(IssueType::TitleTooLong));
+
+        $this->assertSame(
+            Command::SUCCESS,
+            $tester->execute([], ['verbosity' => OutputInterface::VERBOSITY_VERBOSE]),
+        );
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('Something to fix.', $display);
+        $this->assertStringNotContainsString('not listed', $display);
+    }
+
+    public function testWhatIsListedDoesNotChangeWhatFailsTheCommand(): void
+    {
+        $quiet = $this->tester($this->reportWith(IssueType::MultipleH1));
+        $this->assertSame(Command::SUCCESS, $quiet->execute([]));
+        $this->assertStringNotContainsString('Something to fix.', $quiet->getDisplay());
+        $this->assertStringContainsString('multiple_h1', $quiet->getDisplay());
+
+        $strict = $this->tester($this->reportWith(IssueType::MultipleH1));
+        $this->assertSame(Command::FAILURE, $strict->execute(['--fail-on' => 'notice']));
+        $this->assertStringContainsString('Something to fix.', $strict->getDisplay());
+        $this->assertStringNotContainsString('not listed', $strict->getDisplay());
+    }
+
     public function testItReportsWhatChangedSinceThePreviousAudit(): void
     {
         $tester = $this->tester(
@@ -207,16 +279,16 @@ final class CheckSeoCommandTest extends TestCase
         $tester = $this->tester(
             $report,
             previous: new SeoReport(
-            startUrl: 'https://example.com',
-            pages: [
-                ...$report->pages,
-                new PageReport(
-                    'https://example.com/gone',
-                    Response::HTTP_OK,
-                    [new Issue(IssueType::MissingTitle, 'No title.')],
-                ),
-            ],
-        )
+                startUrl: 'https://example.com',
+                pages: [
+                    ...$report->pages,
+                    new PageReport(
+                        'https://example.com/gone',
+                        Response::HTTP_OK,
+                        [new Issue(IssueType::MissingTitle, 'No title.')],
+                    ),
+                ],
+            )
         );
 
         $this->assertSame(Command::FAILURE, $tester->execute([]));

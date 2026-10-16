@@ -11,9 +11,16 @@ The `url` argument is optional if `seo.base_url` is configured. `--only` restric
 modules for that run.
 
 > [!TIP]
-> **CI / Exit Codes:** every issue is always printed, but only issues at or above `--fail-on` (default: `error`) make
-> the command exit with `1`. That way a warning-level finding shows up in the build log without breaking the pipeline,
-> and you can tighten the threshold once the site is clean.
+> **CI / Exit Codes:** only issues at or above `--fail-on` (default: `error`) make the command exit with `1`. That way
+> a lower-severity finding shows up in the build log without breaking the pipeline, and you can tighten the threshold
+> once the site is clean.
+
+The output opens with a count per check, the worst severity first, which is the whole audit in a dozen lines however big
+the site is. The table that follows lists the issues **at or above `--fail-on`** — the ones that decide the exit code
+— and a line says how many are counted but not listed. `-v` lists every one of them instead.
+
+What is displayed never changes what fails: `--fail-on` alone decides the exit code, so adding `-v` to a green build
+keeps it green.
 
 | Exit code | When                                                                                  |
 |-----------|---------------------------------------------------------------------------------------|
@@ -177,4 +184,4 @@ public function __invoke(SeoAuditCompletedEvent $event): void
 ```
 
 What counts as the same issue from one audit to the next, and why a page not audited again is not a page that was fixed,
-is in [Reports](reports.md#what-changed-since-the-previous-audit).
+is in [Reports](reports.md#what-has-changed-since-the-previous-audit).
