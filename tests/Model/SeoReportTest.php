@@ -39,6 +39,76 @@ final class SeoReportTest extends TestCase
         $this->assertSame(['links' => 0, 'on_page' => 3], $report->getIssuesCountByModule());
     }
 
+    public function testGroupsIssuesByTypeWorstFirst(): void
+    {
+        $report = new SeoReport(
+            startUrl: 'https://example.com/',
+            pages: [
+                new PageReport('https://example.com/', Response::HTTP_OK, [
+                    new Issue(IssueType::MultipleH1, 'Two h1.'),
+                    new Issue(IssueType::TitleTooLong, 'Long title.'),
+                    new Issue(IssueType::TitleTooLong, 'Long title again.'),
+                ]),
+                new PageReport('https://example.com/a', Response::HTTP_OK, [
+                    new Issue(IssueType::MultipleH1, 'Two h1.'),
+                    new Issue(IssueType::MissingTitle, 'No title.'),
+                ]),
+            ],
+        );
+
+        $this->assertSame(
+            [
+                ['type' => 'missing_title', 'count' => 1, 'pages' => 1],
+                ['type' => 'title_too_long', 'count' => 2, 'pages' => 1],
+                ['type' => 'multiple_h1', 'count' => 2, 'pages' => 2],
+            ],
+            self::flatten($report->getIssuesByType()),
+        );
+    }
+
+    public function testTwoChecksOfTheSameSeverityAndCountAreOrderedByName(): void
+    {
+        $report = new SeoReport(
+            startUrl: 'https://example.com/',
+            pages: [
+                new PageReport('https://example.com/', Response::HTTP_OK, [
+                    new Issue(IssueType::SitemapMissing, 'No sitemap.'),
+                    new Issue(IssueType::MultipleH1, 'Two h1.'),
+                ]),
+            ],
+        );
+
+        $this->assertSame(
+            [
+                ['type' => 'multiple_h1', 'count' => 1, 'pages' => 1],
+                ['type' => 'sitemap_missing', 'count' => 1, 'pages' => 1],
+            ],
+            self::flatten($report->getIssuesByType()),
+        );
+    }
+
+    public function testAReportWithoutIssuesGroupsNothing(): void
+    {
+        $this->assertSame([], (new SeoReport('https://example.com/'))->getIssuesByType());
+    }
+
+    /**
+     * @param list<array{type: IssueType, count: int, pages: int}> $groups
+     *
+     * @return list<array{type: string, count: int, pages: int}>
+     */
+    private static function flatten(array $groups): array
+    {
+        return array_map(
+            static fn(array $group): array => [
+                'type' => $group['type']->value,
+                'count' => $group['count'],
+                'pages' => $group['pages'],
+            ],
+            $groups,
+        );
+    }
+
     public function testEveryIssueTypeHasASeverityAndAModule(): void
     {
         $severities = [];

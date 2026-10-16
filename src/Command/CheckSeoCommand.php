@@ -18,6 +18,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\LockableTrait;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Helper\Table;
+use Symfony\Component\Console\Helper\TableStyle;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -228,7 +229,7 @@ final class CheckSeoCommand extends Command
                 return Command::SUCCESS;
             }
 
-            self::renderIssuesReport($io, $report);
+            self::renderIssuesReport($io, $report, $failOn, $io->isVerbose());
             self::renderChanges($io, $changes);
 
             if (!$report->hasIssues($failOn)) {
@@ -301,8 +302,12 @@ final class CheckSeoCommand extends Command
         }
     }
 
-    private static function renderIssuesReport(SymfonyStyle $io, SeoReport $report): void
-    {
+    private static function renderIssuesReport(
+        SymfonyStyle $io,
+        SeoReport $report,
+        Severity $failOn,
+        bool $listEveryIssue,
+    ): void {
         $counts = $report->getIssuesCountBySeverity();
 
         $io->section(
@@ -315,6 +320,39 @@ final class CheckSeoCommand extends Command
             )
         );
 
+        self::renderIssueSummary($io, $report);
+        self::renderIssueDetail($io, $report, $failOn, $listEveryIssue);
+    }
+
+    private static function renderIssueSummary(SymfonyStyle $io, SeoReport $report): void
+    {
+        $table = $io->createTable();
+        $table->setHeaders(['Severity', 'Issue', 'Count', 'Pages']);
+        $table->setStyle('box');
+
+        $rightAligned = (new TableStyle())->setPadType(STR_PAD_LEFT);
+        $table->setColumnStyle(2, $rightAligned);
+        $table->setColumnStyle(3, $rightAligned);
+
+        foreach ($report->getIssuesByType() as $group) {
+            $table->addRow([
+                self::formatSeverity($group['type']->severity()),
+                sprintf('<fg=yellow>%s</>', $group['type']->value),
+                $group['count'],
+                $group['pages'],
+            ]);
+        }
+
+        $table->render();
+        $io->newLine();
+    }
+
+    private static function renderIssueDetail(
+        SymfonyStyle $io,
+        SeoReport $report,
+        Severity $failOn,
+        bool $listEveryIssue,
+    ): void {
         $table = $io->createTable();
         $table->setHeaders(['Severity', 'Page', 'Issue', 'Message']);
         $table->setStyle('box');
@@ -331,19 +369,41 @@ final class CheckSeoCommand extends Command
         $table->setColumnMaxWidth(2, $issueWidth);
         $table->setColumnMaxWidth(3, $messageWidth);
 
+        $listed = 0;
+
         foreach ($report->pages as $page) {
             foreach ($page->issues as $issue) {
+                if (!$listEveryIssue && !$issue->severity()->isAtLeast($failOn)) {
+                    continue;
+                }
+
                 $table->addRow([
                     self::formatSeverity($issue->severity()),
                     sprintf('<href=%s>%s</>', $page->url, self::truncate($page->url, $pageWidth)),
                     sprintf('<fg=yellow>%s</>', $issue->type->value),
                     self::truncate($issue->message, $messageWidth),
                 ]);
+                $listed++;
             }
         }
 
-        $table->render();
-        $io->newLine();
+        if ($listed > 0) {
+            $table->render();
+            $io->newLine();
+        }
+
+        $hidden = $report->getIssuesCount() - $listed;
+
+        if ($hidden > 0) {
+            $io->text(
+                sprintf(
+                    '%d issue(s) below "%s" are counted above but not listed. Run with -v to list every one.',
+                    $hidden,
+                    $failOn->value,
+                )
+            );
+            $io->newLine();
+        }
     }
 
     private static function renderChanges(SymfonyStyle $io, ?ReportComparison $changes): void
