@@ -56,7 +56,7 @@ final class SeoReport
     }
 
     /**
-     * @return list<array{type: IssueType, count: int, pages: int}> worst severity first, then most frequent, then by name
+     * @return list<IssueTypeCount> worst severity first, then most frequent, then by name
      */
     public function getIssuesByType(): array
     {
@@ -67,23 +67,20 @@ final class SeoReport
 
             foreach ($page->issues as $issue) {
                 $key = $issue->type->value;
-                $group = $byType[$key] ?? ['type' => $issue->type, 'count' => 0, 'pages' => 0];
+                $counted = $byType[$key] ?? new IssueTypeCount($issue->type, 0, 0);
 
-                $byType[$key] = [
-                    'type' => $group['type'],
-                    'count' => $group['count'] + 1,
-                    'pages' => $group['pages'] + (isset($onThisPage[$key]) ? 0 : 1),
-                ];
+                $byType[$key] = new IssueTypeCount(
+                    $counted->type,
+                    $counted->count + 1,
+                    $counted->pages + (isset($onThisPage[$key]) ? 0 : 1),
+                );
                 $onThisPage[$key] = true;
             }
         }
 
-        usort(
-            $byType,
-            static fn(array $a, array $b): int => $b['type']->severity()->weight() <=> $a['type']->severity()->weight()
-                ?: $b['count'] <=> $a['count']
-                    ?: strcmp($a['type']->value, $b['type']->value),
-        );
+        $byType = array_values($byType);
+
+        usort($byType, static fn(IssueTypeCount $a, IssueTypeCount $b): int => $a->compareTo($b));
 
         return $byType;
     }
