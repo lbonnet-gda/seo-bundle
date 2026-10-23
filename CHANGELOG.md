@@ -3,6 +3,18 @@
 Notable changes to `lbonnet/seo-bundle`, newest first. Versions follow [semantic versioning](https://semver.org/),
 with the usual issue for a 0.x package: a minor release may change behavior or break compatibility, and says so.
 
+## [Unreleased]
+
+### Changed
+
+- `SeoReport::getIssuesByType()` now returns `list<IssueTypeCount>` rather than a list of array shapes. Reading
+  `$group['count']` becomes `$counted->count`. The console output is byte for byte the same; what changes is that
+  the structure can gain a field later without breaking whoever reads it, like every other value object the bundle
+  hands out.
+- `Severity::weight()` is private again, and `Severity::compareTo()` replaces it. Making the weights public in
+  0.5.0 exposed `0`, `1` and `2` as part of the API for no reason beyond sorting; the order is now stated once, in
+  the enum, and asked for as a comparison rather than read as a number.
+
 ## [0.5.0] - 2026-10-16
 
 ### Changed
@@ -107,6 +119,7 @@ site **once** and audits it on three fronts — 60 checks across the `links`, `o
 of which can be turned off. Runs as a console command, a Messenger message, or behind an event listener, and writes
 a JSON report per audit.
 
+[Unreleased]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.2.1...v0.3.0

@@ -334,12 +334,12 @@ final class CheckSeoCommand extends Command
         $table->setColumnStyle(2, $rightAligned);
         $table->setColumnStyle(3, $rightAligned);
 
-        foreach ($report->getIssuesByType() as $group) {
+        foreach ($report->getIssuesByType() as $counted) {
             $table->addRow([
-                self::formatSeverity($group['type']->severity()),
-                sprintf('<fg=yellow>%s</>', $group['type']->value),
-                $group['count'],
-                $group['pages'],
+                self::formatSeverity($counted->type->severity()),
+                sprintf('<fg=yellow>%s</>', $counted->type->value),
+                $counted->count,
+                $counted->pages,
             ]);
         }
 

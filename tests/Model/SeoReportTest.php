@@ -6,6 +6,7 @@ namespace Lbonnet\SeoBundle\Tests\Model;
 
 use Lbonnet\SeoBundle\Model\Issue;
 use Lbonnet\SeoBundle\Model\IssueType;
+use Lbonnet\SeoBundle\Model\IssueTypeCount;
 use Lbonnet\SeoBundle\Model\Module;
 use Lbonnet\SeoBundle\Model\PageReport;
 use Lbonnet\SeoBundle\Model\SeoReport;
@@ -93,19 +94,19 @@ final class SeoReportTest extends TestCase
     }
 
     /**
-     * @param list<array{type: IssueType, count: int, pages: int}> $groups
+     * @param list<IssueTypeCount> $counted
      *
      * @return list<array{type: string, count: int, pages: int}>
      */
-    private static function flatten(array $groups): array
+    private static function flatten(array $counted): array
     {
         return array_map(
-            static fn(array $group): array => [
-                'type' => $group['type']->value,
-                'count' => $group['count'],
-                'pages' => $group['pages'],
+            static fn(IssueTypeCount $one): array => [
+                'type' => $one->type->value,
+                'count' => $one->count,
+                'pages' => $one->pages,
             ],
-            $groups,
+            $counted,
         );
     }
 

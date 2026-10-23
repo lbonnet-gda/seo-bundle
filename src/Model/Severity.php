@@ -15,7 +15,12 @@ enum Severity: string
         return $this->weight() >= $threshold->weight();
     }
 
-    public function weight(): int
+    public function compareTo(self $other): int
+    {
+        return $this->weight() <=> $other->weight();
+    }
+
+    private function weight(): int
     {
         return match ($this) {
             self::Notice => 0,
