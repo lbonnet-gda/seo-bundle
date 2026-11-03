@@ -2,13 +2,15 @@
 
 ## Supported Versions
 
-| Version    | Supported |
-|------------|-----------|
-| Latest 0.x | ✅        |
-| Older 0.x  | ❌        |
+| Version     | Supported |
+|-------------|-----------|
+| Latest 1.x  | ✅        |
+| Earlier 1.x | ❌        |
+| 0.x         | ❌        |
 
-This project is pre-1.0 and follows [SemVer](https://semver.org/): only the latest `0.x` release receives security
-fixes.
+This project follows [SemVer](https://semver.org/): a security fix ships as a new patch release of the current
+minor, and is not backported to an earlier one. The `0.x` series ends with 0.5.0, and upgrading to 1.0.0 is the two
+small changes the [changelog](CHANGELOG.md) lists.
 
 ## Reporting a Vulnerability
 
