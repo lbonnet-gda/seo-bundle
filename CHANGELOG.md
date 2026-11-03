@@ -1,9 +1,16 @@
 # Changelog
 
-Notable changes to `lbonnet/seo-bundle`, newest first. Versions follow [semantic versioning](https://semver.org/),
-with the usual issue for a 0.x package: a minor release may change behavior or break compatibility, and says so.
+Notable changes to `lbonnet/seo-bundle`, newest first. Versions follow [semantic versioning](https://semver.org/):
+from 1.0.0 on, a breaking change to the public API takes a major release. The 0.x entries below came with the usual
+license of a 0.x package — a minor release may change behavior or break compatibility — and each one says where it
+did.
 
-## [Unreleased]
+## [1.0.0] - 2026-11-03
+
+The public API is frozen. `SeoReport` and the models it hands out, `IssueType`, `Severity`, `ReportComparison`, the
+two storage interfaces and `SeoAuditCompletedEvent` keep their shape until a 2.0; a check added later, or a field
+added to a value object, is a minor release. The rule that decides when two issues are the same issue — the one the
+word "fixed" rests on — is frozen with them, and written down in `docs/reports.md`.
 
 ### Changed
 
@@ -14,6 +21,10 @@ with the usual issue for a 0.x package: a minor release may change behavior or b
 - `Severity::weight()` is private again, and `Severity::compareTo()` replaces it. Making the weights public in
   0.5.0 exposed `0`, `1` and `2` as part of the API for no reason beyond sorting; the order is now stated once, in
   the enum, and asked for as a comparison rather than read as a number.
+
+> Six nights of unattended audits on a production site before the freeze: five comparisons, not one false positive
+> over 161 issues, two mails sent at the only two moments that warranted one, and a night missed by a bad deploy
+> handled by comparing against the last report on disk instead of reporting a site full of new issues.
 
 ## [0.5.0] - 2026-10-16
 
@@ -47,9 +58,9 @@ with the usual issue for a 0.x package: a minor release may change behavior or b
   again, and rewording a check's message does not report every issue on the site as new. Issues found on a page the
   new audit did not read are counted on their own — a page missing from a crawl is not a page that was fixed.
 
-> Two audits of a 152-page site, run back to back, report what they should: the second says *Nothing have changed since
-> the previous audit: the same 161 issue (s)* — not one false positive over 161 issues, through a real container, a
-> real crawl, and a real report read back from disk.
+> Two audits of a 152-page site, run back to back, report what they should: the second says *Nothing changed since
+> the previous audit (…): the same 161 issue(s).* — not one false positive over 161 issues, through a real container,
+> a real crawl, and a real report read back from disk.
 
 ## [0.3.0] - 2026-10-12
 
@@ -119,7 +130,7 @@ site **once** and audits it on three fronts — 60 checks across the `links`, `o
 of which can be turned off. Runs as a console command, a Messenger message, or behind an event listener, and writes
 a JSON report per audit.
 
-[Unreleased]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.5.0...HEAD
+[1.0.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.5.0...v1.0.0
 [0.5.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/lbonnet-gda/seo-bundle/compare/v0.2.1...v0.3.0
