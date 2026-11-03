@@ -47,9 +47,9 @@ with the usual issue for a 0.x package: a minor release may change behavior or b
   again, and rewording a check's message does not report every issue on the site as new. Issues found on a page the
   new audit did not read are counted on their own — a page missing from a crawl is not a page that was fixed.
 
-> Two audits of a 152-page site, run back to back, report what they should: the second says *Nothing have changed since
-> the previous audit: the same 161 issue (s)* — not one false positive over 161 issues, through a real container, a
-> real crawl, and a real report read back from disk.
+> Two audits of a 152-page site, run back to back, report what they should: the second says *Nothing changed since
+> the previous audit (…): the same 161 issue(s).* — not one false positive over 161 issues, through a real container,
+> a real crawl, and a real report read back from disk.
 
 ## [0.3.0] - 2026-10-12
 
