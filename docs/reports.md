@@ -176,3 +176,25 @@ An issue that sat on a page the previous audit read and this one did not is neit
 counted in `issuesNoLongerAudited` and appears in neither list. The page may well have been deleted. However, it may
 just as well be blocked by `robots.txt` now, or left out by `max_pages` or `max_depth` — and a monitoring job that
 announced those as fixes would be wrong on the day the crawl was simply cut short.
+
+### A link that answers again was not necessarily fixed
+
+The links an audit checks are not all yours. An external link that times out one night and answers the next
+produces an issue that appeared, then one that was fixed a day later, without anything on the site having changed.
+Over a week of nightly audits on a 154-page site, that was the only change reported at all: two external links,
+broken one night and back two nights later.
+
+A job that notifies on `appeared` is therefore woken by other people's outages. If that matters, require an issue
+to be present in two consecutive audits before acting on it: take what appeared in the previous audit — compare
+the last two stored reports, which `history($startUrl, 2)` returns — and report only those still found today. The
+bundle reports what it sees; how long to wait before believing it is the application's decision.
+
+### The rule is not configurable
+
+`ReportComparer` is final, and the auditor depends on it: the rule above is the same in every installation, which
+is what makes "fixed" mean one thing. If you need another definition — the message in the key, or a context key of
+your own left out of it — read the reports back through `ReportReaderInterface` and compare them yourself. The
+format is documented above, and nothing in the bundle stands in the way.
+
+Changing the rule would also reinterpret the reports already on disk, since comparing reads them back: the first
+audit after such a change reports a wave of appeared and fixed issues that nothing on the site explains.
